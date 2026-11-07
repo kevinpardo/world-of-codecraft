@@ -1,0 +1,186 @@
+{
+  "id": "root",
+  "type": "column",
+  "titlebar": "none",
+  "traffic_lights": [
+    16,
+    23
+  ],
+  "theme": "World-of-Codecraft",
+  "font": "JetBrains Mono",
+  "font_size": 14,
+  "ui_font": "Alegreya Sans",
+  "terminal_padding": [
+    10,
+    8
+  ],
+  "terminal_opacity": 1,
+  "preview": "layouts/World-of-Codecraft.png",
+  "background": "#120c0e",
+  "padding": [
+    0,
+    0
+  ],
+  "resizable": false,
+  "children": [
+    {
+      "id": "fronton",
+      "type": "block",
+      "size": {
+        "px": 48
+      },
+      "window_drag": true,
+      "content": {
+        "mod": "world-of-codecraft",
+        "props": {
+          "role": "fronton"
+        }
+      }
+    },
+    {
+      "id": "bourg",
+      "type": "row",
+      "padding": [
+        6,
+        6
+      ],
+      "gap": 6,
+      "children": [
+        {
+          "id": "tableau",
+          "type": "block",
+          "size": {
+            "px": 262
+          },
+          "min": 200,
+          "max": 420,
+          "background": "#1d1410",
+          "content": {
+            "mod": "world-of-codecraft",
+            "props": {
+              "role": "tableau"
+            }
+          }
+        },
+        {
+          "id": "arene",
+          "type": "column",
+          "resizable": false,
+          "children": [
+            {
+              "id": "cadre-haut",
+              "type": "block",
+              "size": {
+                "px": 14
+              },
+              "content": {
+                "mod": "world-of-codecraft",
+                "props": {
+                  "role": "rail",
+                  "side": "top"
+                }
+              }
+            },
+            {
+              "id": "arene-milieu",
+              "type": "row",
+              "resizable": false,
+              "children": [
+                {
+                  "id": "cadre-gauche",
+                  "type": "block",
+                  "size": {
+                    "px": 14
+                  },
+                  "content": {
+                    "mod": "world-of-codecraft",
+                    "props": {
+                      "role": "rail",
+                      "side": "left"
+                    }
+                  }
+                },
+                {
+                  "id": "main",
+                  "type": "block",
+                  "padding": 6,
+                  "background": "#1a120e",
+                  "content": {
+                    "tab": "active",
+                    "pane": {
+                      "header": {
+                        "content": {
+                          "mod": "world-of-codecraft",
+                          "props": {
+                            "role": "pane"
+                          }
+                        },
+                        "height": 30,
+                        "position": "top",
+                        "reveal": "always"
+                      },
+                      "background": "background",
+                      "border": {
+                        "width": 2,
+                        "color": "#0b080c"
+                      },
+                      "focus": {
+                        "width": 2,
+                        "color": "#f2c25a"
+                      },
+                      "radius": 0,
+                      "gap": 6,
+                      "lone": true
+                    }
+                  }
+                },
+                {
+                  "id": "cadre-droite",
+                  "type": "block",
+                  "size": {
+                    "px": 14
+                  },
+                  "content": {
+                    "mod": "world-of-codecraft",
+                    "props": {
+                      "role": "rail",
+                      "side": "right"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "cadre-bas",
+              "type": "block",
+              "size": {
+                "px": 14
+              },
+              "content": {
+                "mod": "world-of-codecraft",
+                "props": {
+                  "role": "rail",
+                  "side": "bottom"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "place",
+      "type": "block",
+      "size": {
+        "px": 400
+      },
+      "content": {
+        "mod": "world-of-codecraft",
+        "props": {
+          "role": "place"
+        }
+      },
+      "background": "#120c0e"
+    }
+  ]
+}

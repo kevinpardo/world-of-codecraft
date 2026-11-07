@@ -1,0 +1,467 @@
+// The square (bottom strip): Valbrume seen from above, isometric pixel art (direction A, v3).
+// Left, the RTS-style command panel: minimap (click to move the camera) and the selected unit.
+// Right, the village: the static world (ground, buildings, props, shadows, night lights) is baked
+// by outils/bake_world.py into a few big images, day and night, exactly as the approved mocks;
+// only the units, their markers, front cut-outs (depth), glows and smoke are live.
+//
+// Every agent is a hero of its class: working = `work` loop at its class building; idle = `rest`
+// at the campfire; blocked = `idle` + flashing `!` + red ring + speech bubble; done = `idle` + gold
+// `?` + halo. When the spot changes the hero walks there along the road (walk_dl / walk_ur and their
+// mirrors), at its own speed. Frame-by-frame animation uses one shared data timer (~10 fps), only
+// while a visible unit needs it; movement itself is a native `left`/`top` transition. Heroes whose
+// frames aren't synced yet (outils/sync_heroes.py) stand still and breathe natively.
+
+import { div, image } from "gpui-kit";
+import { h_flex, v_flex } from "gpui-base";
+import { agents, spaces, run, setAgentOrder, props, focused, layout } from "herdr";
+import { UI, C, hash, clip, heroOf, heroTitle, guards, QUEST, sky, stop } from "./kit.js";
+import { WORLD, TILES, FRONTS } from "./monde-data.js";
+import { HEROES } from "./heros-data.js";
+import { SPOTS, FIRE, REST, ROAD, BUILDINGS, MARKET, SMOKE, GLOWS } from "./lieux.js";
+import { commandPanel, MINI_INSET } from "./commande.js";
+
+const ART = "mods/world-of-codecraft/art";
+const MONDE = `${ART}/monde`;
+const PANEL = 262; // command panel width (lines up with the quest board)
+const RANK = { blocked: 0, done: 1, working: 2, idle: 3, garde: 4 };
+const LOG_KEY = "valbrume.chronique";
+const TICK = 100; // ms: the shared frame timer (10 fps)
+const ONLY_SELECTED = false; // if CPU is too high: frame-animate only the selected unit
+
+// Where each class works.
+const WORK = { mage: "tour", artificier: "atelier", guerrier: "caserne", pretre: "temple", rodeur: "grange", voleur: "etal1" };
+const RECRUIT = {
+  tour: { argv: ["claude"], what: "a mage (Claude)" },
+  atelier: { argv: ["codex"], what: "an artificer (Codex)" },
+  caserne: { argv: null, what: "a warrior (terminal)" },
+};
+const RACE_EN = { elfe: "elf", orque: "orc", humain: "human", "mort-vivant": "undead", nain: "dwarf" };
+const CLS_EN = { mage: "mage", artificier: "artificer", guerrier: "warrior", pretre: "priest", rodeur: "ranger", voleur: "rogue" };
+const RACE_FR = Object.fromEntries(Object.entries(RACE_EN).map(([f, e]) => [e, f]));
+const CLS_FR = Object.fromEntries(Object.entries(CLS_EN).map(([f, e]) => [e, f]));
+const placeName = (cls) => BUILDINGS[WORK[cls]]?.nom ?? MARKET;
+
+// ------------------------------------------------------------------ the road
+
+const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const ROAD_S = ROAD.reduce((acc, p, i) => (acc.push(i ? acc[i - 1] + dist(ROAD[i - 1], p) : 0), acc), []);
+
+/** The closest point of the road to p: { p, s (arc length), i (segment) }. */
+function onRoad(p) {
+  let best = null;
+  for (let i = 0; i < ROAD.length - 1; i++) {
+    const a = ROAD[i], b = ROAD[i + 1];
+    const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+    const q = [a[0] + t * dx, a[1] + t * dy];
+    const d = dist(p, q);
+    if (!best || d < best.d) best = { d, p: q, s: ROAD_S[i] + t * Math.sqrt(L2), i };
+  }
+  return best;
+}
+
+/** Points from a to b: straight when close, else onto the road, along it, and off it. */
+function route(a, b) {
+  if (dist(a, b) < 170) return [a, b];
+  const ra = onRoad(a), rb = onRoad(b);
+  const pts = [a, ra.p];
+  if (ra.s < rb.s) for (let i = ra.i + 1; i <= rb.i; i++) pts.push(ROAD[i]);
+  else for (let i = ra.i; i > rb.i; i--) pts.push(ROAD[i]);
+  pts.push(rb.p, b);
+  return pts.filter((p, i) => i === 0 || dist(p, pts[i - 1]) > 2);
+}
+
+/** Walk anim for a step: towards the viewer = walk_dl (mirrored: walk_dr), away = walk_ur (walk_ul). */
+const walkAnim = (dx, dy) => (dy > 0 || (dy === 0 && dx < 0) ? (dx <= 0 ? "walk_dl" : "walk_dr") : (dx >= 0 ? "walk_ur" : "walk_ul"));
+
+export default class Place {
+  init(_p, cx) {
+    this.w = 1400;
+    this.camX = null;
+    this.lastFocus = null;
+    this.now = new Date();
+    this.prev = null;
+    this.mob = new Map(); // address -> { x, y, goal, legs: [{ a, b, t0, t1 }] }
+    this.timer = null;
+    this.sig = "";
+    try { this.log = JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"); } catch { this.log = []; }
+    cx.timer.every(60_000, (cx) => { this.now = new Date(); cx.notify(); });
+  }
+
+  // ---------------------------------------------------------------- chronicle
+
+  say(text, kind, address) {
+    this.log.unshift({ at: Date.now(), text, kind, address });
+    this.log = this.log.slice(0, 40);
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(this.log)); } catch {}
+  }
+
+  watch(list) {
+    const now = new Map(list.map((a) => [a.address, a]));
+    if (this.prev) {
+      for (const a of list) {
+        const was = this.prev.get(a.address);
+        const h = heroOf(a.address, a.program);
+        const where = a.status === "idle" ? "Campfire" : placeName(h.cls);
+        const quest = a.tab_name && !/^\d+$/.test(a.tab_name) ? ` "${clip(a.tab_name, 34)}"` : "";
+        if (!was) this.say(`[${where}] ${heroTitle(h)} (${h.prog}) arrives in the village`, a.status, a.address);
+        else if (was.status !== a.status) {
+          if (a.status === "idle" && was.status === "done") continue;
+          const verb = QUEST[a.status].fr + (a.status === "working" || a.status === "done" ? quest : "");
+          this.say(`[${where}] ${heroTitle(h)} (${h.prog}) ${verb}`, a.status, a.address);
+        }
+      }
+      for (const [addr, a] of this.prev) if (!now.has(addr)) this.say(`[Gate] ${heroTitle(heroOf(addr, a.program))} leaves Valbrume`, "idle", null);
+    } else if (!this.log.length) {
+      const b = list.filter((a) => a.status === "blocked").length;
+      this.say(`[Town Crier] Hear ye! ${list.length} ${list.length === 1 ? "hero" : "heroes"} in the village${b ? `, ${b} awaiting your orders` : ""}`, "idle", null);
+    }
+    this.prev = new Map(list.map((a) => [a.address, { status: a.status, program: a.program }]));
+  }
+
+  // ---------------------------------------------------------------- units and movement
+
+  /** Where a unit is at time t, and the leg it walks (null when standing). */
+  pos(m, t) {
+    for (const l of m.legs) {
+      if (t < l.t0) return { x: l.a[0], y: l.a[1], leg: l };
+      if (t < l.t1) {
+        const k = (t - l.t0) / (l.t1 - l.t0);
+        return { x: l.a[0] + (l.b[0] - l.a[0]) * k, y: l.a[1] + (l.b[1] - l.a[1]) * k, leg: l };
+      }
+    }
+    return { x: m.x, y: m.y, leg: null };
+  }
+
+  /** Every unit with its goal spot, current position and leg; starts walks when a goal changes. */
+  units(list, t) {
+    const taken = new Set();
+    const goals = new Map();
+    const want = list.map((a) => {
+      const h = a.demoHero ? { ...heroOf(a.address, a.program), race: RACE_FR[a.demoHero.split("-")[0]], cls: CLS_FR[a.demoHero.split("-")[1]] } : heroOf(a.address, a.program);
+      const group = a.status === "idle" ? "repos" : WORK[h.cls];
+      return { a, h, group, spots: group === "repos" ? REST : SPOTS[group] };
+    });
+    // keep a unit on its current spot when it stays in the same group (no shuffling)
+    for (const u of want) {
+      const m = this.mob.get(u.a.address);
+      if (m && m.group === u.group && !taken.has(m.goal.join())) { taken.add(m.goal.join()); goals.set(u.a.address, m.goal); }
+    }
+    for (const u of want) {
+      if (goals.has(u.a.address)) continue;
+      let g = u.spots.find((p) => !taken.has(p.join()));
+      if (!g) { const k = taken.size; const base = u.spots[k % u.spots.length]; g = [base[0] + 18 * (1 + Math.floor(k / u.spots.length)), base[1] + 6]; }
+      taken.add(g.join());
+      goals.set(u.a.address, g);
+    }
+    const out = [];
+    const alive = new Set();
+    for (const u of want) {
+      const addr = u.a.address;
+      alive.add(addr);
+      const goal = goals.get(addr);
+      let m = this.mob.get(addr);
+      if (!m) { m = { x: goal[0], y: goal[1], goal, group: u.group, legs: [] }; this.mob.set(addr, m); }
+      else if (m.goal.join() !== goal.join()) {
+        const here = this.pos(m, t);
+        const speed = HEROES[`${RACE_EN[u.h.race]}-${CLS_EN[u.h.cls]}`]?.speed ?? 42;
+        const pts = route([here.x, here.y], goal);
+        m.legs = [];
+        let t0 = t;
+        for (let i = 1; i < pts.length; i++) {
+          const t1 = t0 + (dist(pts[i - 1], pts[i]) / speed) * 1000;
+          m.legs.push({ a: pts[i - 1], b: pts[i], t0, t1 });
+          t0 = t1;
+        }
+        m.x = goal[0]; m.y = goal[1]; m.goal = goal; m.group = u.group;
+      }
+      if (m.legs.length && t >= m.legs[m.legs.length - 1].t1) m.legs = [];
+      const p = this.pos(m, t);
+      out.push({ a: u.a, h: u.h, x: p.x, y: p.y, leg: p.leg, key: `${RACE_EN[u.h.race]}-${CLS_EN[u.h.cls]}` });
+    }
+    for (const k of [...this.mob.keys()]) if (!alive.has(k)) this.mob.delete(k);
+    return out;
+  }
+
+  /** The anim a unit plays now, and its sprite info (falls back to the standing sprite). */
+  anim(u) {
+    const H = HEROES[u.key];
+    let name;
+    if (u.leg) name = walkAnim(u.leg.b[0] - u.leg.a[0], u.leg.b[1] - u.leg.a[1]);
+    else name = u.a.status === "working" ? "work" : u.a.status === "idle" ? "rest" : "idle";
+    const info = H?.anims?.[name];
+    if (info) return { name, info, frames: true };
+    return { name: "stand", info: H?.stand ?? { w: 50, h: 85, ax: 25, ay: 83 }, frames: false };
+  }
+
+  unit(u, selected, night, t, animate) {
+    const { a, h } = u;
+    const st = a.status;
+    const an = this.anim(u);
+    const { w, h: hh, ax, ay } = an.info;
+    const suffix = night ? "-n" : "";
+    // the feet point moves (natively, linear, over the rest of the leg); everything hangs from it
+    let el = div().id(`unite-${a.address}`).absolute().left(Math.round(u.leg ? u.leg.b[0] : u.x)).top(Math.round(u.leg ? u.leg.b[1] : u.y)).w(0).h(0);
+    if (u.leg) {
+      const dur = Math.max(16, u.leg.t1 - t);
+      el = el.transition("left", { duration: dur, easing: "linear" }).transition("top", { duration: dur, easing: "linear" });
+    }
+    // rings under the feet
+    if (selected) el = el.child(image(`${MONDE}/ring-selected.png`).absolute().left(-30).top(-17).w(60).h(33));
+    if (st === "blocked" && !u.leg) el = el.child(image(`${MONDE}/ring-blocked.png`).absolute().left(-30).top(-17).w(60).h(33).loop("opacity", { from: 0.2, to: 1, period: 460 }));
+    if (st === "done" && !u.leg) el = el.child(image(`${MONDE}/ring-done.png`).absolute().left(-30).top(-17).w(60).h(33).loop("opacity", { from: 0.45, to: 1, period: 1100 }));
+
+    // the sprite: every frame of the anim stacked (preloaded), only the current one shown
+    let body;
+    if (an.frames) {
+      const dir = `${ART}/heros/${u.key}/${an.name}`;
+      const k = animate ? Math.floor(((t + (hash(a.address) % 997)) / 1000) * an.info.fps) % an.info.n : 0;
+      body = div().absolute().left(-ax).top(-ay).w(w).h(hh)
+        .children(Array.from({ length: an.info.n }, (_, i) =>
+          image(`${dir}/${String(i).padStart(2, "0")}${suffix}.png`).absolute().left(0).top(0).w(w).h(hh).opacity(i === k ? 1 : 0)));
+    } else {
+      // no frames yet: the standing sprite, breathing (1 px) or bobbing while it walks
+      body = div().absolute().left(-ax).top(-ay).w(w).h(hh)
+        .child(image(`${ART}/heros/${u.key}/stand${suffix}.png`).absolute().left(0).top(0).w(w).h(hh)
+          .loop("top", u.leg ? { from: 0, to: -2, period: 380 } : { from: 0, to: -1, period: 2600 + (hash(a.address) % 900) }));
+    }
+    el = el.child(body);
+
+    // hit box, tooltip, click
+    el = el.child(div().id(`clic-${a.address}`).absolute().left(-ax).top(-ay).w(w).h(hh).cursor_pointer()
+      .tooltip(`${heroTitle(h)} · ${h.prog}\n${a.space_name ?? ""} › ${a.tab_name ?? ""}\n${QUEST[st]?.mot ?? "On guard (terminal)"} (click: go there)`)
+      .on_mouse_down("left", stop)
+      .on_click(() => (a.guard ? run("pane.focus", { pane: a.pane }) : run("agent.focus", { terminal: a.address }))));
+
+    const head = -ay;
+    if (st === "blocked" && !u.leg) {
+      el = el.child(image(`${MONDE}/m-blocked.png`).absolute().left(-12).top(head - 42).w(24).h(38)
+        .loop("top", { from: head - 42, to: head - 50, period: 500 }).loop("opacity", { from: 0.35, to: 1, period: 520 }));
+      el = el.child(div().absolute().left(18).top(head - 4).h(22).px(6).rounded(3).bg(C.parch).border_2().border_color(C.woodDark)
+        .flex().items_center().whitespace_nowrap().font_family(UI).text_size(15).text_color(C.wax)
+        .frames(["Help!", "Help!", "Orders?", "Over here!"], 900));
+    }
+    if (st === "done" && !u.leg) {
+      el = el.child(image(`${MONDE}/m-done.png`).absolute().left(-14).top(head - 42).w(28).h(38).loop("top", { from: head - 40, to: head - 48, period: 900 }));
+      el = el.child(div().absolute().left(-22).top(head + 10).size(3).bg(C.goldLight).loop("top", { from: head + 30, to: head - 6, period: 1000 }).loop("opacity", { from: 1, to: 0, period: 1000 }));
+      el = el.child(div().absolute().left(20).top(head + 20).size(3).bg("#fff2c0").loop("top", { from: head + 40, to: head + 2, period: 1300 }).loop("opacity", { from: 1, to: 0, period: 1300 }));
+    }
+    if (st === "idle" && !u.leg) el = el.child(image(`${ART}/z.svg`).absolute().left(14).top(head).size(8).loop("top", { from: head + 10, to: head - 14, period: 2600 }).loop("opacity", { from: 1, to: 0, period: 2600 }));
+    if (selected) {
+      el = el.child(div().absolute().left(-15).top(head - 9).w(30).h(5).bg("#1b1420").border_1().border_color("#000000")
+        .child(div().h_full().w(st === "blocked" ? 8 : 28).bg(st === "blocked" ? "#e5685a" : "#7dff6a")));
+    }
+    return el;
+  }
+
+  // ---------------------------------------------------------------- the frame timer
+
+  /** One shared data timer while something needs frames or walks; it re-renders only when a frame changes. */
+  tick(cx, need) {
+    if (need && !this.timer) {
+      this.timer = cx.timer.every(TICK, (cx) => {
+        const s = this.frameSig(Date.now());
+        if (s !== this.sig) { this.sig = s; cx.notify(); }
+      });
+    } else if (!need && this.timer) { this.timer.cancel(); this.timer = null; }
+  }
+
+  /** What the animated units show at time t (their frames and legs): unchanged = no redraw. */
+  frameSig(t) {
+    let s = "";
+    for (const u of this.anims ?? []) {
+      const m = this.mob.get(u.addr);
+      if (!m) continue;
+      const p = this.pos(m, t);
+      const k = u.fps ? Math.floor(((t + u.ph) / 1000) * u.fps) % u.n : 0;
+      s += `${u.addr}:${k}:${p.leg ? p.leg.t0 : "-"};`;
+    }
+    return s;
+  }
+
+  hidden() {
+    const find = (n) => (!n || typeof n !== "object" ? null : n.id === "place" ? n : (n.children ?? []).map(find).find(Boolean) ?? null);
+    try { return Boolean(find(layout())?.hidden); } catch { return false; }
+  }
+
+  // ---------------------------------------------------------------- world parts
+
+  smoke() {
+    const out = [];
+    SMOKE.forEach(([sx, sy], n) => {
+      for (let k = 0; k < 3; k++) {
+        const x0 = sx - 4, y0 = sy - 8, p = 2800 + k * 520 + n * 130;
+        out.push(div().absolute().left(x0).top(y0).size(7 + k * 2).rounded_full().bg(k === 1 ? "#b9b4bfbb" : "#d8d4dcbb")
+          .loop("top", { from: y0, to: y0 - 44 - k * 10, period: p, easing: "linear" })
+          .loop("left", { from: x0, to: x0 + 10 + k * 6, period: p, easing: "linear" })
+          .loop("opacity", { from: 0.85, to: 0, period: p, easing: "linear" }));
+      }
+    });
+    return out;
+  }
+
+  glows(nightK) {
+    if (nightK <= 0) return [];
+    return GLOWS.map((g) => {
+      const s = g.size;
+      return div().absolute().left(g.at[0] - s / 2).top(g.at[1] - s / 2).size(s).rounded_full().bg(`${g.color}22`)
+        .opacity(nightK).loop("opacity", { from: 0.35 * nightK, to: nightK, period: g.period });
+    });
+  }
+
+  hitboxes() {
+    return Object.entries(BUILDINGS).map(([k, b]) => {
+      const r = RECRUIT[k];
+      let el = div().id(`bat-${k}`).absolute().left(b.box[0]).top(b.box[1]).w(b.box[2]).h(b.box[3])
+        .tooltip(r ? `${b.nom}\nDouble-click: recruit ${r.what}` : b.nom);
+      if (r) el = el.on_click((e) => { if (e.click_count === 2) run("tab.new", r.argv ? { argv: r.argv } : {}); });
+      return el;
+    });
+  }
+
+  /** A front cut-out (the object's own baked pixels), crossfaded like the world. */
+  front(f, nightK) {
+    let el = div().absolute().left(f.x).top(f.y).w(f.w).h(f.h);
+    if (nightK < 1) el = el.child(image(`${MONDE}/avant-${f.key}-jour.png`).absolute().left(0).top(0).w(f.w).h(f.h));
+    if (nightK > 0) el = el.child(image(`${MONDE}/avant-${f.key}-nuit.png`).absolute().left(0).top(0).w(f.w).h(f.h).opacity(nightK));
+    return el;
+  }
+
+  // ---------------------------------------------------------------- the panel
+
+  minimap(units, vw) {
+    const mw = PANEL - MINI_INSET, k = mw / WORLD.w, mh = Math.round(WORLD.h * k);
+    const col = { blocked: C.quest, done: C.gold, working: "#7dff6a", idle: "#cfc8da", garde: "#9aa4b1" };
+    const view = (vw / WORLD.w) * mw;
+    const vx = (this.cam(vw) / WORLD.w) * mw;
+    return div().id("minicarte").relative().w(mw).h(mh).flex_none().cursor_pointer()
+      .tooltip("Village map (click: move the view there)")
+      .on_mouse_down("left", (e, cx) => {
+        const lx = e.local_position?.x;
+        if (typeof lx === "number") { this.camX = (lx / mw) * WORLD.w - vw / 2; cx.notify(); }
+        cx.stop_propagation();
+      })
+      .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
+      .children(units.map((u) => {
+        let d = div().absolute().left(u.x * k - 2).top(u.y * k - 3).size(4).bg(col[u.a.status] ?? "#ffffff").border_1().border_color("#000000");
+        if (u.a.status === "blocked") d = d.loop("opacity", { from: 0.2, to: 1, period: 420 });
+        return d;
+      }))
+      .child(div().absolute().left(vx).top(0).w(view).h(mh).border_1().border_color("#ffffff"));
+  }
+
+  cam(vw) {
+    const max = Math.max(0, WORLD.w - vw);
+    const c = this.camX ?? (WORLD.w / 2 - vw / 2);
+    return Math.max(0, Math.min(max, c));
+  }
+
+  chronicle() {
+    const tone = { blocked: C.quest, done: C.gold, working: "#8fd16a", idle: "#cfc8da" };
+    return v_flex().absolute().left(10).top(8).gap(2).children(this.log.slice(0, 4).map((e, i) => {
+      const tag = e.text.match(/^\[[^\]]+\]/)?.[0] ?? "";
+      const d = new Date(e.at);
+      return h_flex().id(`ev-${i}-${e.at}`).gap(5).px(6).h(20).items_center().rounded(2).bg("#0b0810bb").whitespace_nowrap().cursor_pointer()
+        .opacity(i === 0 ? 1 : 0.9 - i * 0.15)
+        .on_mouse_down("left", stop)
+        .on_click(() => { if (e.address) run("agent.focus", { terminal: e.address }); })
+        .font_family(UI).text_size(16)
+        .child(div().text_color("#8a8296").child(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`))
+        .child(div().text_color(tone[e.kind] ?? C.gold).child(tag))
+        .child(div().text_color(C.cream).child(e.text.slice(tag.length).trim()));
+    }));
+  }
+
+  // ---------------------------------------------------------------- demo (props.demo)
+
+  demo() {
+    const sp = spaces()[0];
+    // [status, program, hero]: the animated heroes first, then fallbacks
+    const D = [["working", "claude", "orc-mage"], ["blocked", "shell", "human-warrior"], ["done", "opencode", "elf-ranger"], ["idle", "codex", "dwarf-artificer"],
+      ["working", "gemini", "human-priest"], ["idle", "claude", "elf-mage"], ["blocked", "aider", "undead-rogue"], ["working", "codex", "orc-artificer"]];
+    const cyc = props()?.demo === "marche" ? Math.floor(Date.now() / 30000) % 2 : 0;
+    return D.map(([status, key, hero], i) => ({
+      address: `demo-${i}-${key}`, space: sp?.id, space_name: sp?.name, tab_name: ["PR review", "tests", "migration", "docs", "rest", "map", "triage", "build"][i],
+      status: cyc && i < 4 ? (status === "idle" ? "working" : "idle") : status, seq: i, focused: false, demoHero: hero,
+      program: { key: key === "shell" ? "sh" : key, name: key, shell: false } }));
+  }
+
+  render(cx) {
+    const t = Date.now();
+    const at = new Date(this.now);
+    if (typeof props()?.heure === "number") at.setHours(props().heure, 0); // demo: another time of day
+    const sk = sky(at);
+    const nightK = sk.phase === "nuit" ? 1 : sk.phase === "jour" ? 0 : 0.55; // night layer over the day one
+    const nightHeroes = sk.phase === "nuit";
+
+    let list = agents().map((a) => ({ ...a }));
+    if (props()?.demo) list = list.concat(this.demo());
+    else this.watch(list);
+    const order = [...list].sort((a, b) => RANK[a.status] - RANK[b.status] || b.seq - a.seq);
+    if (!props()?.demo) setAgentOrder(order.map((a) => a.address));
+    const gs = guards().slice(0, 4).map((p) => ({ address: p.terminal, pane: p.pane, guard: true, status: "garde", program: p.program, tab_name: p.title, focused: p.focused }));
+    const units = this.units([...order, ...gs], t);
+
+    // the selected unit = the focused agent (or the focused shell)
+    const f = focused();
+    const sel = units.find((u) => u.a.address === (f?.agent ?? f?.terminal)) ?? units.find((u) => u.a.focused) ?? null;
+    const vw = Math.max(200, this.w - PANEL);
+    if (sel && sel.a.address !== this.lastFocus) {
+      this.lastFocus = sel.a.address;
+      this.camX = sel.x - vw / 2; // glide to the selected unit
+    } else if (sel?.leg) this.camX = sel.x - vw / 2; // and follow it while it walks
+    const camX = this.cam(vw);
+
+    // frame animation: visible units with frames, or any walking unit
+    const hidden = this.hidden();
+    const visible = (u) => u.x > camX - 80 && u.x < camX + vw + 80;
+    this.anims = [];
+    for (const u of units) {
+      const an = this.anim(u);
+      const animate = !hidden && visible(u) && an.frames && (!ONLY_SELECTED || u === sel);
+      u.animate = animate;
+      if (animate || u.leg) this.anims.push({ addr: u.a.address, fps: animate ? an.info.fps : 0, n: an.info.n ?? 1, ph: hash(u.a.address) % 997 });
+    }
+    this.tick(cx, !hidden && this.anims.length > 0);
+    this.sig = this.frameSig(t);
+
+    // depth: units by feet y (+3, like the compositor), front cut-outs above the units behind them
+    const things = units.map((u) => ({ z: u.y + 3, el: this.unit(u, u === sel, nightHeroes, t, u.animate) }));
+    for (const fr of FRONTS) {
+      const over = units.some((u) => {
+        const an = this.anim(u);
+        const x0 = u.x - an.info.ax, y0 = u.y - an.info.ay;
+        return u.y + 3 < fr.z && x0 < fr.x + fr.w && x0 + an.info.w > fr.x && y0 < fr.y + fr.h && u.y > fr.y;
+      });
+      if (over) things.push({ z: fr.z, el: this.front(fr, nightK) });
+    }
+    things.sort((p, q) => p.z - q.z);
+
+    const worldTop = Math.round(((this.h ?? WORLD.h) - WORLD.h) / 2);
+    const layer = (id) => div().id(id).absolute().top(worldTop).left(-camX).w(WORLD.w).h(WORLD.h)
+      .transition("left", { duration: 650, easing: "ease-in-out" });
+    const world = layer("monde")
+      .children(TILES.map((tl) => image(`${MONDE}/jour-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h)))
+      .when(nightK > 0, (el) => el.children(TILES.map((tl) => image(`${MONDE}/nuit-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h).opacity(nightK))))
+      .children(this.glows(nightK))
+      .children(this.hitboxes())
+      .children(things.map((th) => th.el))
+      .children(this.smoke());
+
+    const panel = commandPanel(PANEL, this.minimap(units, vw), sel);
+
+    return h_flex().id("place").size_full().bg(C.slate)
+      .on_size_change((s, cx) => {
+        if (Math.abs(s.width - this.w) > 10 || s.height !== this.h) { this.w = s.width; this.h = s.height; cx.notify(); }
+      })
+      .child(panel)
+      .child(div().id("vue").flex_1().h_full().relative().overflow_hidden().bg("#3f6b2c")
+        .on_scroll_wheel((e, cx) => {
+          const d = Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y;
+          this.camX = this.cam(vw) - d;
+          cx.notify();
+        })
+        .child(world)
+        .child(this.chronicle()));
+  }
+}
