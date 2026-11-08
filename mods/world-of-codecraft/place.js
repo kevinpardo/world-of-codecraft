@@ -21,6 +21,7 @@ import { SPOTS, FIRE, REST, ROAD, BUILDINGS, market, SMOKE, GLOWS, LISIERE } fro
 import { t as tr, detectLang } from "./i18n.js";
 import { Activites } from "./activite.js";
 import { Ambiance, behind } from "./ambiance.js";
+import { DEMO_LOG } from "./demo.js";
 import { commandPanel, MINI_INSET } from "./commande.js";
 import { EXT } from "./terre-data.js";
 
@@ -399,7 +400,7 @@ export default class Place {
 
   chronicle() {
     const tone = { blocked: C.quest, done: C.gold, working: "#8fd16a", idle: "#cfc8da" };
-    return v_flex().absolute().left(10).top(8).gap(2).children(this.log.slice(0, 4).map((e, i) => {
+    return v_flex().absolute().left(10).top(8).gap(2).children((props()?.demo ? DEMO_LOG : this.log).slice(0, 4).map((e, i) => {
       const tag = e.text.match(/^\[[^\]]+\]/)?.[0] ?? "";
       const d = new Date(e.at);
       return h_flex().id(`ev-${i}-${e.at}`).gap(5).px(6).h(20).items_center().rounded(2).bg("#0b0810bb").whitespace_nowrap().cursor_pointer()
@@ -450,7 +451,7 @@ export default class Place {
     this.live = shared("wocc.anim") !== false;
     if (!this.live) for (const m of this.mob.values()) m.legs = [];
     let list = agents().map((a) => ({ ...a }));
-    if (props()?.demo) list = list.concat(this.demo());
+    if (props()?.demo) list = this.demo(); // screenshots: only the demo heroes, none of the person's agents
     else if (shared("wocc.lang") || Date.now() - this.born > 4000) this.watch(list); // chronicle once the language is known
     const order = [...list].sort((a, b) => RANK[a.status] - RANK[b.status] || b.seq - a.seq);
     if (!props()?.demo) setAgentOrder(order.map((a) => a.address));

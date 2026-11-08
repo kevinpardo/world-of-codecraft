@@ -9,9 +9,10 @@
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, agents, run, shared, window as appWindow } from "herdr";
+import { spaces, agents, run, shared, props, window as appWindow } from "herdr";
 import { VILLAGE, district, clip, heroOf, heroTitle, hourName, hhmm, isNight, readQuotas, left } from "./kit.js";
 import { P, DECO, TEXTE, bar, pic, txt, button, mark, banner } from "./ui.js";
+import { DEMO_SPACES } from "./demo.js";
 import { t, detectLang } from "./i18n.js";
 
 const WORKSHOP = "World-of-Codecraft";
@@ -60,7 +61,7 @@ export default class Fronton {
   }
 
   render(_cx) {
-    const sp = spaces().find((s) => s.active);
+    const sp = (props()?.demo ? DEMO_SPACES : spaces()).find((s) => s.active);
     const tab = sp?.tabs.find((t) => t.active);
     const d = sp ? district(sp) : null;
     const all = agents();

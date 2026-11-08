@@ -210,8 +210,10 @@ button and ctrl-shift-i switch layouts (`layout.switch`; mods restart, the chron
   a swap never loads an image.
 - **Breathing:** heroes without frames show the standing sprite with a native 1 px
   breathing loop.
-- **Demo:** `props: {role: "place", demo: true, heure: 22}` adds demo heroes at night
-  with every activity scene, and `demo: "marche"` makes them walk.
+- **Demo (screenshots):** `demo: true` on the `place` block shows only demo heroes with every activity
+  scene (`heure: 22` for night, `demo: "marche"` makes them walk); on `tableau`, `commande` and `fronton`
+  it shows generic districts, tabs, a selected unit and a chronicle (`demo.js`), so a preview never shows
+  anyone's projects. `lang: "en"` forces the language. The preview was taken that way, window 1600×1000.
 - **Install real files, not symlinks:** Herdr loads images and hot-reloads mods only from
   real paths inside its home. A symlinked mod shows no images and never reloads.
 - **Declare `transition` on every render**, 16 ms while standing: GPUI animates only

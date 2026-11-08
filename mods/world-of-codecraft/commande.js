@@ -64,8 +64,9 @@ export function commandPanel(width, minimap, sel, anim = null) {
 // ------------------------------------------------------------------ the panel as its own block
 
 import { image } from "gpui-kit";
-import { agents, focused, shared, setShared } from "herdr";
+import { agents, focused, shared, setShared, props } from "herdr";
 import { heroOf, guards, C as KC } from "./kit.js";
+import { DEMO_SELECTED } from "./demo.js";
 import { WORLD } from "./monde-data.js";
 
 const MONDE = "mods/world-of-codecraft/art/monde";
@@ -95,6 +96,7 @@ export class Commande {
 
   /** The selected unit, as place.js picks it: the focused agent, else the focused shell. */
   selected() {
+    if (props()?.demo) return { a: DEMO_SELECTED, h: heroOf(DEMO_SELECTED.address, DEMO_SELECTED.program) };
     const f = focused();
     const want = f?.agent ?? f?.terminal;
     const a = agents().find((x) => x.address === want)

@@ -8,10 +8,11 @@
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, agents, run } from "herdr";
+import { spaces, agents, run, props } from "herdr";
 import { district, clip, heroOf } from "./kit.js";
 import { gradient } from "./kit.js";
 import { t } from "./i18n.js";
+import { DEMO_SPACES, DEMO_AGENTS } from "./demo.js";
 import { P, TITRE, frame, frameT, bar, pic, txt, title, button, gem, mark, banner, portrait, well } from "./ui.js";
 
 const ORDER = ["blocked", "done", "working", "idle"];
@@ -91,8 +92,9 @@ export default class Tableau {
   }
 
   render(_cx) {
-    const all = agents();
-    const list = spaces();
+    const demo = Boolean(props()?.demo); // screenshots: generic districts instead of the person's
+    const all = demo ? DEMO_AGENTS : agents();
+    const list = demo ? DEMO_SPACES : spaces();
     const sessions = list.reduce((n, sp) => n + sp.tabs.reduce((m, t) => m + (t.panes || 0), 0), 0);
     const T = frameT("cadre");
     const add = (id, label, tip, fn) => button(id, [pic("ic-plus", 11, 11), txt(label, 15, P.cream, 800)], fn, { tip }).flex_1();
