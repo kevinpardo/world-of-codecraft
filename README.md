@@ -19,6 +19,9 @@ in Valbrume, a village drawn in isometric pixel art, built around one big termin
 - **The village lives on its own.** Villagers walk the road, hens peck by the barn, a cat
   naps at the tavern, fish leap in the river, a stag comes out at dawn, and a guard with a
   lantern walks the night.
+- **An immersive mode** (header button or ctrl-shift-i) swaps the village and the terminal: the village fills
+  the window at the same resolution, on a map three times taller with a forest to the north and fields and
+  groves to the south, and you drag it to look around.
 - **Spaces are districts and tabs are quests,** on the left, with heraldic banners.
 - **Days and nights** follow your clock, with lit windows, a glowing forge and smoking
   chimneys.
