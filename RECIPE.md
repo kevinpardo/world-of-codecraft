@@ -136,12 +136,16 @@ panel below (its own block, role `commande`, 400 px); on the right the village a
 places: the village fills the space above (`place`, weight 1, `props.immersion: true`, no panel inside),
 the framed terminal sits below (400 px, resizable). The header's « Immersion » / « Atelier » (Workshop)
 button and ctrl-shift-i switch layouts (`layout.switch`; mods restart, the chronicle stays).
-- **No zoom: more map.** The village keeps its size; `tools/extend_world.py` paints a 400 px band north
-  (a forest getting denser away from the village, the two dirt paths continued) and south (a meadow with
-  oaks, bushes and rocks, the river flowing on down-left) from the village's own grass samples and
-  cut-outs, colour-matched to the village's edges, with soft feathered borders and a row of trees /
-  bushes standing across each seam (`lisiere-*`; the south one is drawn above the units). Night versions
-  come from a day-to-night colour map fitted on the baked tiles. The village pixels are never touched.
+- **No zoom: more map, baked by the village's own engine.** The direction A art pipeline (procedural voxel
+  models, GI lighting, tiled procedural ground, `compose3` compositor) lives in `tools/village-art/`
+  (rebuilt from the session transcripts on 08/11/2026 and verified pixel-identical to the approved bake).
+  `tools/bake_lands.py` runs that compositor on a canvas 400 px taller on each side: the ground over 1200
+  rows (north paths continued, a lane south of the market, two more fields, the river on its own line), the
+  village's objects drawn whole, a forest to the north and oaks, bushes, rocks and fences to the south. The
+  village tiles are rewritten from the composite only after checking no building pixel changed by day (at
+  night the glow differs by one step on 85 pixels near the north edge); the only change is the forest's soft
+  shadows on the top of the village's grass, which makes the seam invisible. About 9 minutes; `CACHE=x.npz`
+  reuses the composite.
 - **Camera:** horizontal and vertical (drag, two-axis wheel), kept inside the bands; selecting a hero
   brings the village back into view.
 - **Panel bridge:** the village publishes its camera and units to the store (`wocc.view`, only when

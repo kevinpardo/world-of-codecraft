@@ -504,20 +504,14 @@ export default class Place {
     }
     things.sort((p, q) => p.z - q.z);
 
-    // immersive layout: the painted bands around the village (terre-data.js) and a vertical camera too
+    // immersive layout: the lands around the village (tools/bake_lands.py, terre-data.js) and a vertical camera too
     const worldTop = imm ? -this.camV() : Math.round(((this.h ?? WORLD.h) - WORLD.h) / 2);
     const glide = this.drag ? { duration: 16, easing: "linear" } : { duration: 650, easing: "ease-in-out" };
     const band = (name, y) => [
       ...EXT.tiles.map((k) => image(`${MONDE}/${name}-${k}-jour.png`).absolute().left(k * 1000).top(y).w(1000).h(EXT[name])),
       ...(nightK > 0 ? EXT.tiles.map((k) => image(`${MONDE}/${name}-${k}-nuit.png`).absolute().left(k * 1000).top(y).w(1000).h(EXT[name]).opacity(nightK)) : []),
     ];
-    const seam = (name, y) => {
-      const top = y - EXT.seamUp, h = EXT.seamUp + EXT.seamDown;
-      const out = [];
-      if (nightK < 1) out.push(image(`${MONDE}/lisiere-${name}-jour.png`).absolute().left(0).top(top).w(WORLD.w).h(h));
-      if (nightK > 0) out.push(image(`${MONDE}/lisiere-${name}-nuit.png`).absolute().left(0).top(top).w(WORLD.w).h(h).opacity(nightK));
-      return out;
-    };
+
     // the camera glides (650 ms) except while the view is dragged, where it follows the pointer
     const layer = (id) => div().id(id).absolute().top(worldTop).left(-camX).w(WORLD.w).h(WORLD.h)
       .transition("left", glide).transition("top", glide);
@@ -527,9 +521,7 @@ export default class Place {
       .when(nightK > 0, (el) => el.children(TILES.map((tl) => image(`${MONDE}/nuit-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h).opacity(nightK))))
       .children(this.glows(nightK))
       .children(this.hitboxes())
-      .when(imm, (el) => el.children(seam("nord", 0)))
       .children(things.map((th) => th.el))
-      .when(imm, (el) => el.children(seam("sud", WORLD.h))) // nearer the viewer than anyone in the village
       .children(this.smoke());
 
     const panel = imm ? null : commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) });

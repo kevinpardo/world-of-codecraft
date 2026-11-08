@@ -2,7 +2,7 @@
 their shadows and night lights) pre-composited by the art's own compositor (compose3.py), day and night,
 so Herdr only draws a few big images plus the live units.
 
-  ART=<village-art/A> <venv>/bin/python tools/bake_world.py
+  tools/village-art/build_assets.sh && tools/village-art/.venv/bin/python tools/bake_world.py
 
 Writes, under art/monde/:
   jour-<k>.png, nuit-<k>.png   the 3000x400 logical world cut in 1000-px-wide tiles (PNG at 2x: 2000x800)
@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 
 MOD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mods", "world-of-codecraft")
-ART = os.environ.get("ART") or sys.exit("ART=<village-art/A> is required")
+ART = os.environ.get("ART") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "village-art")
 os.chdir(ART)
 sys.path.insert(0, ART)
 import compose2 as C2  # noqa: E402
@@ -33,6 +33,12 @@ def save2(arr, path):
     Image.fromarray(arr).resize((arr.shape[1] * 2, arr.shape[0] * 2), Image.NEAREST).save(path, optimize=True)
 
 
+class _Meta(dict):
+    def __missing__(self, k):
+        return {'w': 1, 'h': 1, 'ax': 0, 'ay': 0}  # the old demo heroes: dropped just below
+
+
+C2.META = _Meta(C2.META)
 O, _E = C2.scene()
 O = [o for o in O if o[0].startswith("b-")]  # the static world only: no heroes, no hero effects
 day = C3.compose(False, O, [])

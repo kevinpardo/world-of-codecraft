@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 mods/world-of-codecraft/gpui-kit.d.ts
 mods/world-of-codecraft/jsconfig.json
+tools/village-art/assets/
+tools/village-art/.venv/
