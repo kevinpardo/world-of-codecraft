@@ -31,8 +31,8 @@ the clock. The art is original: it imitates no existing game.
   The card frame turns gold when the space is shown and ruby when a hero needs you.
   At the bottom are "+ Quest" (new tab) and "+ District" (new space) buttons.
 - **Terminal** (centre). The tab block sits inside four `rail` blocks (14 px gilded
-  moulding). Panes use JetBrains Mono 14 on dark oak `#1a1411`, theme
-  `World-of-Codecraft`. Each pane header (30 px) is an oak plank with rivets and holds:
+  moulding). Panes use JetBrains Mono on dark oak `#1a1411`, theme
+  `World-of-Codecraft`; the text size is left to Herdr's settings. Each pane header (30 px) is an oak plank with rivets and holds:
   - the hero portrait;
   - "Name, Race class", the program and a state gem with its label;
   - the tab title and folder;
@@ -92,8 +92,9 @@ the clock. The art is original: it imitates no existing game.
   if set, else macOS `AppleLanguages`, else `LC_ALL` / `LC_MESSAGES` / `LANG`; French when
   it starts with `fr`. Shared with every copy of the mod through the store key `wocc.lang`.
   A block's `props.lang` (`"fr"` / `"en"`) forces it.
-- **Keys** (`layout:World-of-Codecraft`): ctrl-shift-j toggles the village, and
-  ctrl-shift-b toggles the left column.
+- **Keys** (`layout:World-of-Codecraft`): ctrl-shift-i switches the immersive mode
+  (`world-of-codecraft.mode`), ctrl-shift-j toggles the bottom village, and ctrl-shift-b
+  toggles the left column (`gauche`).
 
 ## Activity scenes and village life
 
@@ -158,14 +159,19 @@ a hidden one keeps no timers. The layout sets no terminal text size, so Herdr's 
 
 - **Layout tree:** a root column made of:
   - `fronton` (block, 48 px);
-  - `bourg` (row, 6 px padding and gap), holding `tableau` (block, 262 px, min 200,
-    max 420) and `arene` (column: four `rail` blocks around the `main` tab block);
-  - `place` (block, 400 px).
+  - `bourg` (row, 6 px padding and gap), holding:
+    - `gauche` (column, 262 px, min 200, max 420): `tableau` (weight 1) and `commande`
+      (400 px, hidden outside the immersive mode);
+    - `droite` (column): `place-immersion` (weight 1, `props.immersion`, hidden outside the
+      immersive mode) and `arene` (weight 1, 400 px in the immersive mode; a column of four
+      `rail` blocks around the `main` tab block);
+  - `place` (block, 400 px, hidden in the immersive mode).
 
-  The root has `titlebar: none`, background `#120c0e`, `ui_font` Alegreya Sans and a
-  PNG `preview`.
+  The root has `titlebar: none`, background `#120c0e`, `font` JetBrains Mono, `ui_font`
+  Alegreya Sans, no `font_size`, and a PNG `preview`. There is one layout file; the
+  immersive mode is a set of layout clicks on it.
 - **The mod** is `mods/world-of-codecraft`, one mod with roles picked by `props.role`:
-  - `fronton.js`: the top bar
+  - `fronton.js`: the top bar and the immersive-mode switch
   - `tableau.js`: the districts column
   - `rail`: the gilded moulding
   - `place.js`: the world and the command panel, with `commande.js`
@@ -186,7 +192,7 @@ a hidden one keeps no timers. The layout sets no terminal text size, so Herdr's 
   - commands: `agent.focus`, `agent.next`, `pane.focus`, `space.select`, `tab.select`,
     `tab.new`, `space.new`, `pane.split`, `pane.zoom` and `pane.close`.
 - **Timers:** one shared 100 ms timer runs only while a visible unit animates or walks,
-  and stops when `place` is hidden. The clock ticks every 30 s; the sky and quotas
+  and stops when its village block (`place` or `place-immersion`) is hidden. The clock ticks every 30 s; the sky and quotas
   update every 60 s.
 - **Files read and programs run:** the activity files in `~/.local/state/world-of-codecraft/`
   (if the integrations are installed) and `~/.local/state/claude-duo/quota-{A,B}.json`
@@ -236,5 +242,7 @@ a hidden one keeps no timers. The layout sets no terminal text size, so Herdr's 
   another agent glides the camera, and a minimap click moves it.
 - Without cduo files, the top bar shows no empty quota plaques.
 - With a French system the whole interface is in French, otherwise English.
+- The « Immersion » / « Atelier » button swaps the village and the terminal without changing
+  layout, and the mode survives a restart. The terminal text size follows Herdr's settings.
 - With the Claude Code hook installed, a working Claude hero scouts while reading and
   fights a creature while editing; the « Animations » toggle stops every animation.

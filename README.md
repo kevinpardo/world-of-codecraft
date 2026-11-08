@@ -19,8 +19,8 @@ in Valbrume, a village drawn in isometric pixel art, built around one big termin
 - **The village lives on its own.** Villagers walk the road, hens peck by the barn, a cat
   naps at the tavern, fish leap in the river, a stag comes out at dawn, and a guard with a
   lantern walks the night.
-- **An immersive mode** (header button or ctrl-shift-i) swaps the village and the terminal: the village fills
-  the window at the same resolution, on a map three times taller with a forest to the north and fields and
+- **An immersive mode** (header button or ctrl-shift-i), in the same layout, swaps the village and the
+  terminal: the village fills the window at the same resolution, on a map three times taller with a forest to the north and fields and
   groves to the south, and you drag it to look around.
 - **Spaces are districts and tabs are quests,** on the left, with heraldic banners.
 - **Days and nights** follow your clock, with lit windows, a glowing forge and smoking
@@ -28,7 +28,8 @@ in Valbrume, a village drawn in isometric pixel art, built around one big termin
 - **French or English,** picked from your system language.
 - **An « Animations » switch** under the minimap turns everything to still images when you
   want to save CPU.
-- **A warm terminal theme**: dark oak background, parchment text and a gold cursor.
+- **A warm terminal theme**: dark oak background, parchment text and a gold cursor. The text size is
+  yours: the layout leaves it to Herdr's settings.
 
 ## Install
 
@@ -41,8 +42,9 @@ tools/install.sh                  # copies the layout, theme and mod into ~/.con
 herdr-app do layout.switch '{"name":"World-of-Codecraft"}'
 ```
 
-Then merge `mods/world-of-codecraft/KEYS.json` into your `keys.json`: `ctrl-shift-j`
-toggles the village and `ctrl-shift-b` toggles the left column. Run `tools/install.sh`
+Then merge `mods/world-of-codecraft/KEYS.json` into your `keys.json`: `ctrl-shift-i`
+switches the immersive mode, `ctrl-shift-j` toggles the village and `ctrl-shift-b` toggles
+the left column. Run `tools/install.sh`
 again after a `git pull`. It installs real files, not symlinks: Herdr loads images and
 reloads mods only from real files inside its home.
 
