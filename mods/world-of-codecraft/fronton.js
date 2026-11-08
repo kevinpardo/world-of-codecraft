@@ -12,11 +12,13 @@ import { h_flex, v_flex } from "gpui-base";
 import { spaces, agents, run, window as appWindow } from "herdr";
 import { VILLAGE, district, clip, heroOf, heroTitle, hourName, hhmm, isNight, readQuotas, left } from "./kit.js";
 import { P, DECO, TEXTE, bar, pic, txt, button, mark, banner } from "./ui.js";
+import { t, detectLang } from "./i18n.js";
 
 const PW = 136; // plaque width
 
 export default class Fronton {
   init(_p, cx) {
+    detectLang(cx); // the system language, shared with every copy of the mod
     this.now = new Date();
     this.q = [];
     const tick = (cx) => {
@@ -41,9 +43,9 @@ export default class Fronton {
     const q = this.q.find((x) => x.acc === acc) ?? { missing: true };
     if (q.missing || !q.week) return null; // no quota file: no plaque at all
     const rem = Math.max(0, 100 - q.week.used);
-    const five = q.five ? `5h: ${100 - q.five.used}%` : `account ${acc}`;
-    const tip = `${label} = Claude account ${acc}\n${rem}% left this week (fair in ${left(q.week.resets) || "?"})${q.five ? `\n5-hour window: ${100 - q.five.used}% left${q.five.resets ? ` (${left(q.five.resets)})` : ""}` : ""}${q.stale ? "\nReading older than 30 min" : ""}`;
-    return this.plaque(`res-${acc}`, icon, `${rem}%${q.stale ? " ?" : ""}`, five, tip, rem <= 20);
+    const five = q.five ? t("five", 100 - q.five.used) : t("account", acc);
+    const tip = t("quotaTip", label, acc, rem, left(q.week.resets) || "?", q.five ? 100 - q.five.used : null, q.five?.resets ? left(q.five.resets) : "", q.stale);
+    return this.plaque(`res-${acc}`, icon, `${t("pct", rem)}${q.stale ? " ?" : ""}`, five, tip, rem <= 20);
   }
 
   render(_cx) {
@@ -59,8 +61,8 @@ export default class Fronton {
     const night = isNight(this.now);
     const resets = this.q.map((q) => q.week?.resets).filter(Boolean);
     const fair = resets.length ? left(Math.min(...resets)) : "";
-    const gold = this.quota("A", "Gold", pic("ic-or", 32, 24));
-    const wood = this.quota("B", "Wood", pic("ic-bois", 36, 28));
+    const gold = this.quota("A", t("gold"), pic("ic-or", 32, 24));
+    const wood = this.quota("B", t("wood"), pic("ic-bois", 36, 28));
 
     const waiting = blocked.length ? blocked : done;
     let alert = null;
@@ -69,15 +71,15 @@ export default class Fronton {
       const h = heroOf(waiting[0].address, waiting[0].program);
       alert = button("alerte", [
         mark(isB ? "blocked" : "done"),
-        txt(waiting.length > 1 ? `${waiting.length} ${isB ? "waiting" : "quests to turn in"}` : `${h.name} ${isB ? "is waiting" : "is done"}`, 16, isB ? P.goldHi : P.cream, 800),
+        txt(waiting.length > 1 ? t("waitingMany", waiting.length, isB) : t("waitingOne", h.name, isB), 16, isB ? P.goldHi : P.cream, 800),
       ], () => run("agent.focus", { terminal: waiting[0].address }), {
         face: isB ? "or" : "", h: 28,
-        tip: `${heroTitle(h)} ${isB ? "awaits your orders" : "is back from a quest"} (click: go there)`,
+        tip: t("waitingTip", heroTitle(h), isB),
       });
     }
 
     // the district's banner and the parchment scroll (flat vellum behind the text)
-    const scroll = d && h_flex().id("rouleau").tooltip(`${d.titre}${tab ? `\nQuest: ${tab.name}` : ""}`).flex_shrink(1).min_w(0).max_w(620).h(44).gap(4).items_center()
+    const scroll = d && h_flex().id("rouleau").tooltip(`${d.titre}${tab ? `\n${t("questTab", tab.name)}` : ""}`).flex_shrink(1).min_w(0).max_w(620).h(44).gap(4).items_center()
       .child(div().flex_none().h(40).mt(2).child(banner(d)))
       .child(div().relative().flex_shrink(1).min_w(0).h(34).pl(16).pr(16).flex().items_center().overflow_hidden()
         .children(bar("rouleau"))
@@ -88,7 +90,7 @@ export default class Fronton {
             .child(txt(clip(tab.name, 44), 16, P.wax, 800).min_w(0).truncate()))));
 
     const hour = div().id("heure").relative().flex_none().w(170).h(40)
-      .tooltip(`${hourName(this.now)} (canonical hour) · ${night ? "night" : "day"}`)
+      .tooltip(t("hourTip", hourName(this.now), night))
       .child(pic("plaque-l", 170, 40).absolute().left(0).top(0))
       .child(div().absolute().left(10).top(10).child(pic(night ? "ic-lune" : "ic-soleil", 20, 20)))
       .child(h_flex().absolute().left(42).right(10).top(0).bottom(0).items_center().justify_between()
@@ -104,11 +106,11 @@ export default class Fronton {
           .child(div().absolute().left(10).top(3).child(pic("blason", 30, 36)))
           .child(v_flex().absolute().left(46).top(0).bottom(0).justify_center()
             .child(div().font_family(DECO).font_weight(700).text_size(17).line_height(1.1).text_color(P.goldHi).child("World of Codecraft"))
-            .child(txt(`village of ${VILLAGE}`, 13, P.muted, 700).line_height(1.1))))
+            .child(txt(t("villageOf", VILLAGE), 13, P.muted, 700).line_height(1.1))))
         .when(Boolean(gold), (el) => el.child(gold))
         .when(Boolean(wood), (el) => el.child(wood))
-        .child(this.plaque("res-heros", pic("ic-heros", 26, 22), `${busy} / ${all.length}`, "heroes at work", `${busy} heroes at work, ${all.length} agents in the village`))
-        .when(resets.length > 0, (el) => el.child(this.plaque("res-foire", pic("ic-sablier", 22, 28), fair || "—", "until the fair", "The fair: the weekly reset of the Claude quotas")))
+        .child(this.plaque("res-heros", pic("ic-heros", 26, 22), `${busy} / ${all.length}`, t("heroesAtWork"), t("heroesTip", busy, all.length)))
+        .when(resets.length > 0, (el) => el.child(this.plaque("res-foire", pic("ic-sablier", 22, 28), fair || "—", t("untilFair"), t("fairTip"))))
         .child(div().flex_1().min_w(0).flex().justify_center().when(Boolean(scroll), (el) => el.child(scroll)))
         .when(Boolean(alert), (el) => el.child(alert))
         .child(hour));

@@ -1,4 +1,4 @@
-// World of Codecraft: the interface kit. Pixel-art pieces drawn by outils/ui.py (art/ui/),
+// World of Codecraft: the interface kit. Pixel-art pieces drawn by tools/ui.py (art/ui/),
 // composed here. Herdr has no 9-slice and no image tiling, so a frame is four corners plus
 // four long edge strips, each strip cropped (never stretched) by an overflow-hidden box: the
 // strips are uniform along their length, so they fit any size, crisp, with no seam.

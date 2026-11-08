@@ -1,7 +1,7 @@
-// The square (bottom strip): Valbrume seen from above, isometric pixel art (direction A, v3).
+// La place (bottom strip): Valbrume seen from above, isometric pixel art (direction A, v3).
 // Left, the RTS-style command panel: minimap (click to move the camera) and the selected unit.
 // Right, the village: the static world (ground, buildings, props, shadows, night lights) is baked
-// by outils/bake_world.py into a few big images, day and night, exactly as the approved mocks;
+// by tools/bake_world.py into a few big images, day and night, exactly as the approved mocks;
 // only the units, their markers, front cut-outs (depth), glows and smoke are live.
 //
 // Every agent is a hero of its class: working = `work` loop at its class building; idle = `rest`
@@ -9,37 +9,40 @@
 // `?` + halo. When the spot changes the hero walks there along the road (walk_dl / walk_ur and their
 // mirrors), at its own speed. Frame-by-frame animation uses one shared data timer (~10 fps), only
 // while a visible unit needs it; movement itself is a native `left`/`top` transition. Heroes whose
-// frames aren't synced yet (outils/sync_heroes.py) stand still and breathe natively.
+// frames aren't synced yet (tools/sync_heroes.py) stand still and breathe natively.
 
 import { div, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { agents, spaces, run, setAgentOrder, props, focused, layout } from "herdr";
+import { agents, spaces, run, setAgentOrder, props, focused, layout, shared, setShared } from "herdr";
 import { UI, C, hash, clip, heroOf, heroTitle, guards, QUEST, sky, stop } from "./kit.js";
 import { WORLD, TILES, FRONTS } from "./monde-data.js";
 import { HEROES } from "./heros-data.js";
-import { SPOTS, FIRE, REST, ROAD, BUILDINGS, MARKET, SMOKE, GLOWS } from "./lieux.js";
+import { SPOTS, FIRE, REST, ROAD, BUILDINGS, market, SMOKE, GLOWS, LISIERE } from "./lieux.js";
+import { t as tr, detectLang } from "./i18n.js";
+import { Activites } from "./activite.js";
+import { Ambiance, behind } from "./ambiance.js";
 import { commandPanel, MINI_INSET } from "./commande.js";
 
 const ART = "mods/world-of-codecraft/art";
 const MONDE = `${ART}/monde`;
 const PANEL = 262; // command panel width (lines up with the quest board)
 const RANK = { blocked: 0, done: 1, working: 2, idle: 3, garde: 4 };
-const LOG_KEY = "valbrume.chronique";
+const LOG_KEY = "wocc.chronicle";
 const TICK = 100; // ms: the shared frame timer (10 fps)
 const ONLY_SELECTED = false; // if CPU is too high: frame-animate only the selected unit
 
 // Where each class works.
 const WORK = { mage: "tour", artificier: "atelier", guerrier: "caserne", pretre: "temple", rodeur: "grange", voleur: "etal1" };
 const RECRUIT = {
-  tour: { argv: ["claude"], what: "a mage (Claude)" },
-  atelier: { argv: ["codex"], what: "an artificer (Codex)" },
-  caserne: { argv: null, what: "a warrior (terminal)" },
+  tour: { argv: ["claude"], get what() { return tr("recruit").tour; } },
+  atelier: { argv: ["codex"], get what() { return tr("recruit").atelier; } },
+  caserne: { argv: null, get what() { return tr("recruit").caserne; } },
 };
 const RACE_EN = { elfe: "elf", orque: "orc", humain: "human", "mort-vivant": "undead", nain: "dwarf" };
 const CLS_EN = { mage: "mage", artificier: "artificer", guerrier: "warrior", pretre: "priest", rodeur: "ranger", voleur: "rogue" };
 const RACE_FR = Object.fromEntries(Object.entries(RACE_EN).map(([f, e]) => [e, f]));
 const CLS_FR = Object.fromEntries(Object.entries(CLS_EN).map(([f, e]) => [e, f]));
-const placeName = (cls) => BUILDINGS[WORK[cls]]?.nom ?? MARKET;
+const placeName = (cls) => BUILDINGS[WORK[cls]]?.nom ?? market();
 
 // ------------------------------------------------------------------ the road
 
@@ -76,6 +79,8 @@ const walkAnim = (dx, dy) => (dy > 0 || (dy === 0 && dx < 0) ? (dx <= 0 ? "walk_
 
 export default class Place {
   init(_p, cx) {
+    detectLang(cx);
+    this.born = Date.now();
     this.w = 1400;
     this.camX = null;
     this.lastFocus = null;
@@ -84,6 +89,9 @@ export default class Place {
     this.mob = new Map(); // address -> { x, y, goal, legs: [{ a, b, t0, t1 }] }
     this.timer = null;
     this.sig = "";
+    this.act = new Activites(); // what each hero does while working (Claude Code hook)
+    this.amb = new Ambiance(); // village life: walkers, animals, treasury, fair (only when animated)
+    this.live = true; // the « Animations » toggle (shared wocc.anim): off = still images, no walk, no scenes
     try { this.log = JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"); } catch { this.log = []; }
     cx.timer.every(60_000, (cx) => { this.now = new Date(); cx.notify(); });
   }
@@ -102,19 +110,19 @@ export default class Place {
       for (const a of list) {
         const was = this.prev.get(a.address);
         const h = heroOf(a.address, a.program);
-        const where = a.status === "idle" ? "Campfire" : placeName(h.cls);
-        const quest = a.tab_name && !/^\d+$/.test(a.tab_name) ? ` "${clip(a.tab_name, 34)}"` : "";
-        if (!was) this.say(`[${where}] ${heroTitle(h)} (${h.prog}) arrives in the village`, a.status, a.address);
+        const where = a.status === "idle" ? tr("campfire") : placeName(h.cls);
+        const quest = a.tab_name && !/^\d+$/.test(a.tab_name) ? tr("quoted", clip(a.tab_name, 34)) : "";
+        if (!was) this.say(`[${where}] ${tr("arrives", heroTitle(h), h.prog)}`, a.status, a.address);
         else if (was.status !== a.status) {
           if (a.status === "idle" && was.status === "done") continue;
           const verb = QUEST[a.status].fr + (a.status === "working" || a.status === "done" ? quest : "");
           this.say(`[${where}] ${heroTitle(h)} (${h.prog}) ${verb}`, a.status, a.address);
         }
       }
-      for (const [addr, a] of this.prev) if (!now.has(addr)) this.say(`[Gate] ${heroTitle(heroOf(addr, a.program))} leaves Valbrume`, "idle", null);
+      for (const [addr, a] of this.prev) if (!now.has(addr)) this.say(`[${tr("gate")}] ${tr("leaves", heroTitle(heroOf(addr, a.program)))}`, "idle", null);
     } else if (!this.log.length) {
       const b = list.filter((a) => a.status === "blocked").length;
-      this.say(`[Town Crier] Hear ye! ${list.length} ${list.length === 1 ? "hero" : "heroes"} in the village${b ? `, ${b} awaiting your orders` : ""}`, "idle", null);
+      this.say(`[${tr("crier")}] ${tr("hearYe", list.length, b)}`, "idle", null);
     }
     this.prev = new Map(list.map((a) => [a.address, { status: a.status, program: a.program }]));
   }
@@ -139,8 +147,9 @@ export default class Place {
     const goals = new Map();
     const want = list.map((a) => {
       const h = a.demoHero ? { ...heroOf(a.address, a.program), race: RACE_FR[a.demoHero.split("-")[0]], cls: CLS_FR[a.demoHero.split("-")[1]] } : heroOf(a.address, a.program);
-      const group = a.status === "idle" ? "repos" : WORK[h.cls];
-      return { a, h, group, spots: group === "repos" ? REST : SPOTS[group] };
+      const scout = a.status === "working" && this.act.scene(a.address) === "eclaire" && LISIERE[WORK[h.cls]];
+      const group = a.status === "idle" ? "repos" : scout ? `lisiere-${WORK[h.cls]}` : WORK[h.cls];
+      return { a, h, group, spots: group === "repos" ? REST : scout ? LISIERE[WORK[h.cls]] : SPOTS[group] };
     });
     // keep a unit on its current spot when it stays in the same group (no shuffling)
     for (const u of want) {
@@ -162,6 +171,7 @@ export default class Place {
       const goal = goals.get(addr);
       let m = this.mob.get(addr);
       if (!m) { m = { x: goal[0], y: goal[1], goal, group: u.group, legs: [] }; this.mob.set(addr, m); }
+      else if (m.goal.join() !== goal.join() && !this.live) { m.x = goal[0]; m.y = goal[1]; m.goal = goal; m.group = u.group; m.legs = []; }
       else if (m.goal.join() !== goal.join()) {
         const here = this.pos(m, t);
         const speed = HEROES[`${RACE_EN[u.h.race]}-${CLS_EN[u.h.cls]}`]?.speed ?? 42;
@@ -188,7 +198,7 @@ export default class Place {
     const H = HEROES[u.key];
     let name;
     if (u.leg) name = walkAnim(u.leg.b[0] - u.leg.a[0], u.leg.b[1] - u.leg.a[1]);
-    else name = u.a.status === "working" ? "work" : u.a.status === "idle" ? "rest" : "idle";
+    else name = (u.a.status === "working" && this.act.anim(u.a.address)) || (u.a.status === "working" ? "work" : u.a.status === "idle" ? "rest" : "idle");
     const info = H?.anims?.[name];
     if (info) return { name, info, frames: true };
     return { name: "stand", info: H?.stand ?? { w: 50, h: 85, ax: 25, ay: 83 }, frames: false };
@@ -202,14 +212,16 @@ export default class Place {
     const suffix = night ? "-n" : "";
     // the feet point moves (natively, linear, over the rest of the leg); everything hangs from it
     let el = div().id(`unite-${a.address}`).absolute().left(Math.round(u.leg ? u.leg.b[0] : u.x)).top(Math.round(u.leg ? u.leg.b[1] : u.y)).w(0).h(0);
-    if (u.leg) {
-      const dur = Math.max(16, u.leg.t1 - t);
+    // always declared (16 ms when standing): GPUI animates only changes made after the transition exists,
+    // so adding it on the render that sets the first leg's target made that leg jump
+    {
+      const dur = u.leg ? Math.max(16, u.leg.t1 - t) : 16;
       el = el.transition("left", { duration: dur, easing: "linear" }).transition("top", { duration: dur, easing: "linear" });
     }
     // rings under the feet
     if (selected) el = el.child(image(`${MONDE}/ring-selected.png`).absolute().left(-30).top(-17).w(60).h(33));
-    if (st === "blocked" && !u.leg) el = el.child(image(`${MONDE}/ring-blocked.png`).absolute().left(-30).top(-17).w(60).h(33).loop("opacity", { from: 0.2, to: 1, period: 460 }));
-    if (st === "done" && !u.leg) el = el.child(image(`${MONDE}/ring-done.png`).absolute().left(-30).top(-17).w(60).h(33).loop("opacity", { from: 0.45, to: 1, period: 1100 }));
+    if (st === "blocked" && !u.leg) el = el.child(image(`${MONDE}/ring-blocked.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.2, to: 1, period: 460 })));
+    if (st === "done" && !u.leg) el = el.child(image(`${MONDE}/ring-done.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.45, to: 1, period: 1100 })));
 
     // the sprite: every frame of the anim stacked (preloaded), only the current one shown
     let body;
@@ -223,30 +235,31 @@ export default class Place {
       // no frames yet: the standing sprite, breathing (1 px) or bobbing while it walks
       body = div().absolute().left(-ax).top(-ay).w(w).h(hh)
         .child(image(`${ART}/heros/${u.key}/stand${suffix}.png`).absolute().left(0).top(0).w(w).h(hh)
-          .loop("top", u.leg ? { from: 0, to: -2, period: 380 } : { from: 0, to: -1, period: 2600 + (hash(a.address) % 900) }));
+          .when(this.live, (e) => e.loop("top", u.leg ? { from: 0, to: -2, period: 380 } : { from: 0, to: -1, period: 2600 + (hash(a.address) % 900) })));
     }
     el = el.child(body);
 
     // hit box, tooltip, click
     el = el.child(div().id(`clic-${a.address}`).absolute().left(-ax).top(-ay).w(w).h(hh).cursor_pointer()
-      .tooltip(`${heroTitle(h)} · ${h.prog}\n${a.space_name ?? ""} › ${a.tab_name ?? ""}\n${QUEST[st]?.mot ?? "On guard (terminal)"} (click: go there)`)
+      .tooltip(tr("unitTip", heroTitle(h), h.prog, `${a.space_name ?? ""} › ${a.tab_name ?? ""}`, QUEST[st]?.mot ?? tr("onGuardTerm")))
       .on_mouse_down("left", stop)
       .on_click(() => (a.guard ? run("pane.focus", { pane: a.pane }) : run("agent.focus", { terminal: a.address }))));
 
     const head = -ay;
     if (st === "blocked" && !u.leg) {
       el = el.child(image(`${MONDE}/m-blocked.png`).absolute().left(-12).top(head - 42).w(24).h(38)
-        .loop("top", { from: head - 42, to: head - 50, period: 500 }).loop("opacity", { from: 0.35, to: 1, period: 520 }));
+        .when(this.live, (e) => e.loop("top", { from: head - 42, to: head - 50, period: 500 })).when(this.live, (e) => e.loop("opacity", { from: 0.35, to: 1, period: 520 })));
       el = el.child(div().absolute().left(18).top(head - 4).h(22).px(6).rounded(3).bg(C.parch).border_2().border_color(C.woodDark)
         .flex().items_center().whitespace_nowrap().font_family(UI).text_size(15).text_color(C.wax)
-        .frames(["Help!", "Help!", "Orders?", "Over here!"], 900));
+        .when(this.live, (e) => e.frames(tr("help"), 900)).when(!this.live, (e) => e.child(tr("help")[0])));
     }
     if (st === "done" && !u.leg) {
-      el = el.child(image(`${MONDE}/m-done.png`).absolute().left(-14).top(head - 42).w(28).h(38).loop("top", { from: head - 40, to: head - 48, period: 900 }));
-      el = el.child(div().absolute().left(-22).top(head + 10).size(3).bg(C.goldLight).loop("top", { from: head + 30, to: head - 6, period: 1000 }).loop("opacity", { from: 1, to: 0, period: 1000 }));
-      el = el.child(div().absolute().left(20).top(head + 20).size(3).bg("#fff2c0").loop("top", { from: head + 40, to: head + 2, period: 1300 }).loop("opacity", { from: 1, to: 0, period: 1300 }));
+      el = el.child(image(`${MONDE}/m-done.png`).absolute().left(-14).top(head - 42).w(28).h(38).when(this.live, (e) => e.loop("top", { from: head - 40, to: head - 48, period: 900 })));
+      el = el.child(div().absolute().left(-22).top(head + 10).size(3).bg(C.goldLight).when(this.live, (e) => e.loop("top", { from: head + 30, to: head - 6, period: 1000 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1000 })));
+      el = el.child(div().absolute().left(20).top(head + 20).size(3).bg("#fff2c0").when(this.live, (e) => e.loop("top", { from: head + 40, to: head + 2, period: 1300 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1300 })));
     }
-    if (st === "idle" && !u.leg) el = el.child(image(`${ART}/z.svg`).absolute().left(14).top(head).size(8).loop("top", { from: head + 10, to: head - 14, period: 2600 }).loop("opacity", { from: 1, to: 0, period: 2600 }));
+    if (st === "idle" && !u.leg) el = el.child(image(`${ART}/z.svg`).absolute().left(14).top(head).size(8).when(this.live, (e) => e.loop("top", { from: head + 10, to: head - 14, period: 2600 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 2600 })));
+    if (!u.leg && !a.guard) el = el.children(this.act.layers(u, head, night, t));
     if (selected) {
       el = el.child(div().absolute().left(-15).top(head - 9).w(30).h(5).bg("#1b1420").border_1().border_color("#000000")
         .child(div().h_full().w(st === "blocked" ? 8 : 28).bg(st === "blocked" ? "#e5685a" : "#7dff6a")));
@@ -288,13 +301,14 @@ export default class Place {
 
   smoke() {
     const out = [];
+    if (!this.live) return out;
     SMOKE.forEach(([sx, sy], n) => {
       for (let k = 0; k < 3; k++) {
         const x0 = sx - 4, y0 = sy - 8, p = 2800 + k * 520 + n * 130;
         out.push(div().absolute().left(x0).top(y0).size(7 + k * 2).rounded_full().bg(k === 1 ? "#b9b4bfbb" : "#d8d4dcbb")
-          .loop("top", { from: y0, to: y0 - 44 - k * 10, period: p, easing: "linear" })
-          .loop("left", { from: x0, to: x0 + 10 + k * 6, period: p, easing: "linear" })
-          .loop("opacity", { from: 0.85, to: 0, period: p, easing: "linear" }));
+          .when(this.live, (e) => e.loop("top", { from: y0, to: y0 - 44 - k * 10, period: p, easing: "linear" }))
+          .when(this.live, (e) => e.loop("left", { from: x0, to: x0 + 10 + k * 6, period: p, easing: "linear" }))
+          .when(this.live, (e) => e.loop("opacity", { from: 0.85, to: 0, period: p, easing: "linear" })));
       }
     });
     return out;
@@ -305,7 +319,7 @@ export default class Place {
     return GLOWS.map((g) => {
       const s = g.size;
       return div().absolute().left(g.at[0] - s / 2).top(g.at[1] - s / 2).size(s).rounded_full().bg(`${g.color}22`)
-        .opacity(nightK).loop("opacity", { from: 0.35 * nightK, to: nightK, period: g.period });
+        .opacity(nightK).when(this.live, (e) => e.loop("opacity", { from: 0.35 * nightK, to: nightK, period: g.period }));
     });
   }
 
@@ -313,7 +327,7 @@ export default class Place {
     return Object.entries(BUILDINGS).map(([k, b]) => {
       const r = RECRUIT[k];
       let el = div().id(`bat-${k}`).absolute().left(b.box[0]).top(b.box[1]).w(b.box[2]).h(b.box[3])
-        .tooltip(r ? `${b.nom}\nDouble-click: recruit ${r.what}` : b.nom);
+        .tooltip(r ? tr("recruitTip", b.nom, r.what) : b.nom);
       if (r) el = el.on_click((e) => { if (e.click_count === 2) run("tab.new", r.argv ? { argv: r.argv } : {}); });
       return el;
     });
@@ -335,7 +349,7 @@ export default class Place {
     const view = (vw / WORLD.w) * mw;
     const vx = (this.cam(vw) / WORLD.w) * mw;
     return div().id("minicarte").relative().w(mw).h(mh).flex_none().cursor_pointer()
-      .tooltip("Village map (click: move the view there)")
+      .tooltip(tr("mapTip"))
       .on_mouse_down("left", (e, cx) => {
         const lx = e.local_position?.x;
         if (typeof lx === "number") { this.camX = (lx / mw) * WORLD.w - vw / 2; cx.notify(); }
@@ -344,7 +358,7 @@ export default class Place {
       .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
       .children(units.map((u) => {
         let d = div().absolute().left(u.x * k - 2).top(u.y * k - 3).size(4).bg(col[u.a.status] ?? "#ffffff").border_1().border_color("#000000");
-        if (u.a.status === "blocked") d = d.loop("opacity", { from: 0.2, to: 1, period: 420 });
+        if (u.a.status === "blocked") d = d.when(this.live, (e) => e.loop("opacity", { from: 0.2, to: 1, period: 420 }));
         return d;
       }))
       .child(div().absolute().left(vx).top(0).w(view).h(mh).border_1().border_color("#ffffff"));
@@ -378,11 +392,23 @@ export default class Place {
     const sp = spaces()[0];
     // [status, program, hero]: the animated heroes first, then fallbacks
     const D = [["working", "claude", "orc-mage"], ["blocked", "shell", "human-warrior"], ["done", "opencode", "elf-ranger"], ["idle", "codex", "dwarf-artificer"],
-      ["working", "gemini", "human-priest"], ["idle", "claude", "elf-mage"], ["blocked", "aider", "undead-rogue"], ["working", "codex", "orc-artificer"]];
+      ["working", "gemini", "human-priest"], ["working", "claude", "elf-mage"], ["blocked", "aider", "undead-rogue"], ["working", "codex", "orc-artificer"],
+      ["working", "claude", "human-mage"], ["working", "claude", "undead-mage"]];
+    // demo activities (props.demo): combat with a blow every 2.5 s and a failed tool every 20 s, a scout with
+    // two familiars, a meditation, a thinker; the scene changes immediately (no file, no anti-zapping wait)
+    const n = Date.now();
+    const ACT = {
+      0: { act: "code", tache: 1, coups: Math.floor(n / 2500) % 400, subs: 0, err: 1, errT: n - (n % 20000), t: n },
+      5: { act: "eclaire", tache: 1, subs: 2, t: n },
+      7: { act: "test", tache: 1, essai: { ok: Math.floor(n / 12000) % 2 === 0, t: n - (n % 12000) }, commitT: n - (n % 15000), pushT: n - (n % 30000), t: n },
+      8: { act: "pense", tache: 1, subs: 1, t: n },
+      9: { act: "code", tache: 7, coups: Math.floor(n / 3100) % 400, subs: 0, errTache: 3, t: n }, // the troll boss
+      4: { act: "medite", tache: 1, subs: 0, t: n },
+    };
     const cyc = props()?.demo === "marche" ? Math.floor(Date.now() / 30000) % 2 : 0;
     return D.map(([status, key, hero], i) => ({
-      address: `demo-${i}-${key}`, space: sp?.id, space_name: sp?.name, tab_name: ["PR review", "tests", "migration", "docs", "rest", "map", "triage", "build"][i],
-      status: cyc && i < 4 ? (status === "idle" ? "working" : "idle") : status, seq: i, focused: false, demoHero: hero,
+      address: `demo-${i}-${key}`, space: sp?.id, space_name: sp?.name, tab_name: tr("demoTabs")[i],
+      status: cyc && i < 4 ? (status === "idle" ? "working" : "idle") : status, seq: i, focused: false, demoHero: hero, demoAct: ACT[i],
       program: { key: key === "shell" ? "sh" : key, name: key, shell: false } }));
   }
 
@@ -394,12 +420,15 @@ export default class Place {
     const nightK = sk.phase === "nuit" ? 1 : sk.phase === "jour" ? 0 : 0.55; // night layer over the day one
     const nightHeroes = sk.phase === "nuit";
 
+    this.live = shared("wocc.anim") !== false;
+    if (!this.live) for (const m of this.mob.values()) m.legs = [];
     let list = agents().map((a) => ({ ...a }));
     if (props()?.demo) list = list.concat(this.demo());
-    else this.watch(list);
+    else if (shared("wocc.lang") || Date.now() - this.born > 4000) this.watch(list); // chronicle once the language is known
     const order = [...list].sort((a, b) => RANK[a.status] - RANK[b.status] || b.seq - a.seq);
     if (!props()?.demo) setAgentOrder(order.map((a) => a.address));
     const gs = guards().slice(0, 4).map((p) => ({ address: p.terminal, pane: p.pane, guard: true, status: "garde", program: p.program, tab_name: p.title, focused: p.focused }));
+    this.act.watch(cx, order, this.hidden(), !this.live);
     const units = this.units([...order, ...gs], t);
 
     // the selected unit = the focused agent (or the focused shell)
@@ -418,7 +447,7 @@ export default class Place {
     this.anims = [];
     for (const u of units) {
       const an = this.anim(u);
-      const animate = !hidden && visible(u) && an.frames && (!ONLY_SELECTED || u === sel);
+      const animate = this.live && !hidden && visible(u) && an.frames && (!ONLY_SELECTED || u === sel);
       u.animate = animate;
       if (animate || u.leg) this.anims.push({ addr: u.a.address, fps: animate ? an.info.fps : 0, n: an.info.n ?? 1, ph: hash(u.a.address) % 997 });
     }
@@ -427,13 +456,19 @@ export default class Place {
 
     // depth: units by feet y (+3, like the compositor), front cut-outs above the units behind them
     const things = units.map((u) => ({ z: u.y + 3, el: this.unit(u, u === sel, nightHeroes, t, u.animate) }));
+    for (const u of units) { const c = this.act.creature(u, nightHeroes); if (c) things.push(c); }
+    const working = list.filter((a) => a.status === "working").length;
+    this.amb.watch(cx, this.live && !hidden, { phase: sk.phase });
+    const life = this.live ? this.amb.things(nightHeroes, sk.phase, working) : [];
+    things.push(...life);
     for (const fr of FRONTS) {
       const over = units.some((u) => {
         const an = this.anim(u);
         const x0 = u.x - an.info.ax, y0 = u.y - an.info.ay;
         return u.y + 3 < fr.z && x0 < fr.x + fr.w && x0 + an.info.w > fr.x && y0 < fr.y + fr.h && u.y > fr.y;
       });
-      if (over) things.push({ z: fr.z, el: this.front(fr, nightK) });
+      const walkerBehind = life.some((th) => th.box && behind(th.box).includes(fr));
+      if (over || walkerBehind) things.push({ z: fr.z, el: this.front(fr, nightK) });
     }
     things.sort((p, q) => p.z - q.z);
 
@@ -448,7 +483,7 @@ export default class Place {
       .children(things.map((th) => th.el))
       .children(this.smoke());
 
-    const panel = commandPanel(PANEL, this.minimap(units, vw), sel);
+    const panel = commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) });
 
     return h_flex().id("place").size_full().bg(C.slate)
       .on_size_change((s, cx) => {

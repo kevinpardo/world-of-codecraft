@@ -11,16 +11,12 @@ import { h_flex, v_flex } from "gpui-base";
 import { spaces, agents, run } from "herdr";
 import { district, clip, heroOf } from "./kit.js";
 import { gradient } from "./kit.js";
+import { t } from "./i18n.js";
 import { P, TITRE, frame, frameT, bar, pic, txt, title, button, gem, mark, banner, portrait, well } from "./ui.js";
 
 const ORDER = ["blocked", "done", "working", "idle"];
-const STATE = {
-  blocked: { mot: "need help", color: P.blocked },
-  done: { mot: "to turn in", color: P.done },
-  working: { mot: "on a quest", color: P.working },
-  idle: { mot: "resting", color: P.idle },
-};
-const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+const COLOR = { blocked: P.blocked, done: P.done, working: P.working, idle: P.idle };
+const STATE = new Proxy({}, { get: (_o, k) => ({ mot: t("board")[k], color: COLOR[k] }) });
 
 export default class Tableau {
   heading(text, extra) {
@@ -44,11 +40,11 @@ export default class Tableau {
   quest(sp, tab, heroes) {
     const st = tab.status;
     const on = sp.active && tab.active;
-    const name = tab.named ? tab.name : (heroes[0]?.title && heroes[0].title !== heroes[0].program?.name ? heroes[0].title : `Quest #${tab.index}`);
+    const name = tab.named ? tab.name : (heroes[0]?.title && heroes[0].title !== heroes[0].program?.name ? heroes[0].title : t("questN", tab.index));
     const fg = on ? P.ink2 : st === "blocked" ? "#ffd8cc" : P.cream;
     let line = h_flex().id(`quete-${tab.id}`).relative().h(28).pl(5).pr(4).gap(6).items_center().rounded(2).cursor_pointer()
       .bg(on ? P.parch : st === "blocked" ? "#3a1216" : "#00000000").hover((s) => s.bg(on ? P.parch : "#ffffff10"))
-      .tooltip(`Quest ${tab.index}: ${tab.name}${tab.panes > 1 ? ` (${tab.panes} sessions)` : ""} (click: show it)`)
+      .tooltip(t("questTip", tab.index, tab.name, tab.panes))
       .on_click(() => { if (!sp.active) run("space.select", { id: sp.id }); run("tab.select", { id: tab.id }); })
       .child(div().w(16).flex_none().flex().justify_center().child(mark(st) ?? (st ? gem(st, true) : div().size(5).rounded(1).bg(on ? P.inkSoft : P.faint))))
       .child(txt(clip(name, 32), 15, fg, on ? 800 : 700).flex_1().min_w(0).truncate())
@@ -71,13 +67,13 @@ export default class Tableau {
     // the district's head: banner, name, sessions and heroes, the big counter
     const head = h_flex().id(`quartier-tete-${sp.id}`).h(46).pl(6).pr(4).gap(8).items_center().cursor_pointer()
       .hover((s) => s.bg("#ffffff08"))
-      .tooltip(`${d.titre}${sp.machine ? ` @${sp.machine}` : ""} (click: go there)`)
+      .tooltip(`${d.titre}${sp.machine ? ` @${sp.machine}` : ""} ${t("goThere")}`)
       .on_click(() => run("space.select", { id: sp.id }))
       .child(div().flex_none().mt(-6).child(banner(d)))
       .child(v_flex().flex_1().min_w(0).gap(0)
         .child(txt(`${d.num} · ${d.nom}`, 18, sp.active ? P.goldHi : P.cream, 800).truncate())
-        .child(txt(`${plural(sessions, "session", "sessions")} · ${plural(heroes.length, "hero", "heroes")}`, 14, P.muted, 700).truncate()))
-      .child(div().relative().flex_none().size(32).tooltip(`${plural(sessions, "session", "sessions")} in this district`)
+        .child(txt(`${t("sessions", sessions)} · ${t("heroes", heroes.length)}`, 14, P.muted, 700).truncate()))
+      .child(div().relative().flex_none().size(32).tooltip(t("sessionsHere", t("sessions", sessions)))
         .child(pic("medaillon", 32, 32).absolute().left(0).top(0))
         .child(div().absolute().left(0).top(0).size(32).flex().items_center().justify_center()
           .child(div().font_family(TITRE).font_weight(700).text_size(15).text_color(P.goldHi).child(String(sessions)))));
@@ -103,12 +99,12 @@ export default class Tableau {
     return div().id("tableau").size_full().relative().bg(P.leather)
       .child(gradient("#2b1e16", "#100b0a", 165))
       .child(v_flex().absolute().left(T).right(T).top(T).bottom(T)
-        .child(this.heading("Districts", plural(sessions, "session", "sessions")))
+        .child(this.heading(t("districts"), t("sessions", sessions)))
         .child(v_flex().id("quartiers").flex_1().min_h(0).overflow_y_scrollbar().px(2).pb(10)
           .children(list.map((sp) => this.district(sp, all)))
           .child(h_flex().mx(2).mt(10).gap(6)
-            .child(add("nouvelle-quete", "Quest", "Start a new quest (a new tab in this district)", () => run("tab.new", {})))
-            .child(add("nouveau-quartier", "District", "Found a new district (a new space)", () => run("space.new", {}))))))
+            .child(add("nouvelle-quete", t("newQuest"), t("newQuestTip"), () => run("tab.new", {})))
+            .child(add("nouveau-quartier", t("newDistrict"), t("newDistrictTip"), () => run("space.new", {}))))))
       .children(frame("cadre"));
   }
 }

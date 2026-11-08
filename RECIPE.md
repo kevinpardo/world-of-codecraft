@@ -84,9 +84,45 @@ the clock. The art is original: it imitates no existing game.
   dawn and dusk). Window and campfire glows pulse, and chimneys smoke.
 - **Chronicle:** it logs arrivals, departures and state changes ("[Mage Tower] Gromdal,
   Dwarf mage (Claude Code) sets out on a quest"). It is kept in the store key
-  `valbrume.chronique`.
+  `wocc.chronicle`.
+- **Language:** French or English, detected once per start (see `i18n.js`): `WOCC_LANG`
+  if set, else macOS `AppleLanguages`, else `LC_ALL` / `LC_MESSAGES` / `LANG`; French when
+  it starts with `fr`. Shared with every copy of the mod through the store key `wocc.lang`.
+  A block's `props.lang` (`"fr"` / `"en"`) forces it.
 - **Keys** (`layout:World-of-Codecraft`): ctrl-shift-j toggles the village, and
   ctrl-shift-b toggles the left column.
+
+## Activity scenes and village life
+
+- **What a hero is doing**, not just its state: while Herdr says `working`, the hero plays
+  a scene read from `~/.local/state/world-of-codecraft/<terminal address>.json`, written by
+  the optional integrations (`integrations/claude-code/wocc-activity.py`, an async Claude
+  Code hook; `integrations/opencode/wocc-activity.js`, an OpenCode plugin). Fields: `act`,
+  `outil`, `coups`, `err` / `errT`, `errTache`, `subs`, `tache`, `essai {ok, t}`,
+  `commitT`, `pushT`. Without them heroes keep the plain status behaviour.
+  - thinking: `idle` + a "· · ·" bubble;
+  - reading / searching / web: walks to a scout spot at the forest edge near its building
+    (`LISIERE` in lieux.js), two ravens circling;
+  - editing code: fights a creature drawn per task (mages: imp, wolf, goblin, boar, rust
+    golem, spectre; other classes: their district's beasts, `DISTRICT` in activite.js). Each
+    successful edit is a blow (hit pose + flash), 4 fell it (puff) and the next one comes;
+    3+ failed tools in a task bring the forest troll, a boss of 8 blows. A failed tool hits
+    the hero (red flash, "Ouch!");
+  - running tests: a training dummy beside the hero, struck while they run; the result stays
+    5 s: knocked over + "Tests passed!", or "Tests failing";
+  - compacting: sits cross-legged (`rest`), sparks orbit, a crystal pulses;
+  - git commit: a seal and "Sealed!"; git push: a carrier pigeon flies off east;
+  - subagents: one wisp per running subagent.
+  - **Anti-zapping:** a scene changes only when asked for 8 s and the current one is 15 s
+    old (20 s / 40 s to or from the forest edge); meditation, tests and the end switch at once.
+- **Village life** (`ambiance.js`): walkers with pauses on the road (a peasant woman and a
+  farmer by day, a merchant when 2+ heroes work, a guard with a lantern at night), hens by the
+  barn, the tavern cat, a stag at dawn and dusk, sparrows over the fields, fish leaping in the
+  river, a treasury of up to 5 coins (account A's week left, cduo only) and fair pennants the
+  day before the weekly reset.
+- **« Animations » toggle** under the minimap (store key `wocc.anim`, default on). Off:
+  heroes stand on still frames, no walking, no scenes, enemies, village life or smoke, and
+  no activity polling (about 10 % of a core instead of 27 % on an M2 Pro).
 
 ## Built from
 
@@ -111,7 +147,10 @@ the clock. The art is original: it imitates no existing game.
     9-slice;
   - `lieux.js`: unit spots, the road and building hit boxes;
   - `heros-data.js` and `monde-data.js`: animation frame tables and world tiles,
-    generated.
+    generated;
+  - `activite.js`: the activity scenes; `ambiance.js`: village life;
+    `creatures-data.js`: creature and villager sprites, generated;
+  - `i18n.js`: every visible string in French and English, and the language detection.
 - **Herdr API:**
   - data: `spaces()`, `agents()`, `panes()`, `focused()` and the store;
   - commands: `agent.focus`, `agent.next`, `pane.focus`, `space.select`, `tab.select`,
@@ -119,8 +158,13 @@ the clock. The art is original: it imitates no existing game.
 - **Timers:** one shared 100 ms timer runs only while a visible unit animates or walks,
   and stops when `place` is hidden. The clock ticks every 30 s; the sky and quotas
   update every 60 s.
-- **Files read:** only `~/.local/state/claude-duo/quota-{A,B}.json` (cduo), and only if
-  it exists. The mod makes no network calls and runs no programs.
+- **Files read and programs run:** the activity files in `~/.local/state/world-of-codecraft/`
+  (if the integrations are installed) and `~/.local/state/claude-duo/quota-{A,B}.json`
+  (cduo, if present). Once per start it runs `sh` to read the system language
+  (`defaults read -g AppleLanguages`, `$LANG`). No network calls.
+- **Repo tooling** (`tools/`, not installed): `install.sh` copies the mod, layout and theme
+  into the Herdr home (`--integrations` links the hook and plugin); `sync_creatures.py`,
+  `sync_heroes.py`, `bake_world.py`, `ui.py` rebuild the art from `tools/sources/`.
 - **Art** (`art/`):
   - heroes: 30 race×class sprites with `idle`, `rest`, `work` and 4-way walk frames,
     plus night-graded copies;
@@ -139,8 +183,18 @@ the clock. The art is original: it imitates no existing game.
   a swap never loads an image.
 - **Breathing:** heroes without frames show the standing sprite with a native 1 px
   breathing loop.
-- **Demo:** `props: {role: "place", demo: true, heure: 22}` adds 8 demo heroes at
-  night, and `demo: "marche"` makes them walk.
+- **Demo:** `props: {role: "place", demo: true, heure: 22}` adds demo heroes at night
+  with every activity scene, and `demo: "marche"` makes them walk.
+- **Install real files, not symlinks:** Herdr loads images and hot-reloads mods only from
+  real paths inside its home. A symlinked mod shows no images and never reloads.
+- **Declare `transition` on every render**, 16 ms while standing: GPUI animates only
+  changes made after the transition exists, so adding it with the new target jumps there.
+- **Two-frame swaps need both loops:** the top frame `opacity -6 → 7`, the one below
+  `7 → -6`, same period, linear, created on the same render (clamped, almost instant).
+- **Walkers' depth** comes from where they really are on their leg; the 1 s ambient timer
+  redraws when one passes behind or out from behind a front cut-out.
+- **Many hot reloads** (dozens) can exhaust the mod's JS heap ("out of memory", then
+  "Null"): restart the Herdr window.
 
 ## Done when
 
@@ -149,3 +203,6 @@ the clock. The art is original: it imitates no existing game.
 - Each agent appears at its class building. Blocked shows `!` and a red ring. Focusing
   another agent glides the camera, and a minimap click moves it.
 - Without cduo files, the top bar shows no empty quota plaques.
+- With a French system the whole interface is in French, otherwise English.
+- With the Claude Code hook installed, a working Claude hero scouts while reading and
+  fights a creature while editing; the « Animations » toggle stops every animation.

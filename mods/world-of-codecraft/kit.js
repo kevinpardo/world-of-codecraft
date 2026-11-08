@@ -5,6 +5,7 @@
 import { div, image, svg, PathBuilder, Background } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { home, readTextFile, panes } from "herdr";
+import { t, tbl } from "./i18n.js";
 
 export const ART = "mods/world-of-codecraft/art";
 export const TITLE = "Cinzel"; // Roman capitals, headings only (fonts/, OFL)
@@ -48,8 +49,8 @@ export function folder(cwd) {
 // ------------------------------------------------------------------ heroes
 
 export const RACES = ["elfe", "orque", "humain", "mort-vivant", "nain"];
-// Display names (the keys stay as the art file names use them).
-export const RACE_FR = { elfe: "Elf", orque: "Orc", humain: "Human", "mort-vivant": "Undead", nain: "Dwarf" };
+// Display names in the current language (the keys stay as the art file names use them).
+export const RACE_FR = tbl("race");
 const NAMES = {
   elfe: ["Aelith", "Sylvarin", "Elowen", "Thalindra", "Faelar", "Liriel", "Ithrandë"],
   orque: ["Grokka", "Murzag", "Ushna", "Thrakk", "Bolgra", "Zugor", "Krasha"],
@@ -59,12 +60,12 @@ const NAMES = {
 };
 
 export const CLASSES = {
-  mage: { nom: "mage", bat: "tour", item: "baton" },
-  artificier: { nom: "artificer", bat: "atelier", item: "cle" },
-  guerrier: { nom: "warrior", bat: "caserne", item: "marteau" },
-  pretre: { nom: "priest", bat: "temple", item: "relique" },
-  rodeur: { nom: "ranger", bat: "grange", item: "arc" },
-  voleur: { nom: "rogue", bat: "etal1", item: "dague" },
+  mage: { get nom() { return t("cls").mage; }, bat: "tour", item: "baton" },
+  artificier: { get nom() { return t("cls").artificier; }, bat: "atelier", item: "cle" },
+  guerrier: { get nom() { return t("cls").guerrier; }, bat: "caserne", item: "marteau" },
+  pretre: { get nom() { return t("cls").pretre; }, bat: "temple", item: "relique" },
+  rodeur: { get nom() { return t("cls").rodeur; }, bat: "grange", item: "arc" },
+  voleur: { get nom() { return t("cls").voleur; }, bat: "etal1", item: "dague" },
 };
 
 /** The class a program plays: Claude a mage, Codex an artificer, shells warriors… */
@@ -88,14 +89,12 @@ export function heroOf(address, program) {
   return { race, cls, name, prog: program?.name ?? "agent", sprite: `${ART}/h-${race}-${cls}`, item: CLASSES[cls].item };
 }
 
-export const heroTitle = (h) => `${h.name}, ${RACE_FR[h.race]} ${CLASSES[h.cls].nom}`;
+/** "Orc mage" / "mage orque". */
+export const heroDesc = (h) => t("hero", RACE_FR[h.race], CLASSES[h.cls].nom);
+export const heroTitle = (h) => `${h.name}, ${heroDesc(h)}`;
 
-export const QUEST = {
-  working: { mot: "On a quest", fr: "sets out on a quest" },
-  blocked: { mot: "Help needed!", fr: "needs help" },
-  done: { mot: "Quest to turn in", fr: "has finished the quest" },
-  idle: { mot: "Resting", fr: "rests by the campfire" },
-};
+/** Per state: `mot` (the short word) and `fr` (the chronicle verb), in the current language. */
+export const QUEST = tbl("quest");
 
 /** Shell terminals (not agents) of every tab: the warriors on guard at the forge. */
 export function guards() {
@@ -104,14 +103,12 @@ export function guards() {
 
 // ------------------------------------------------------------------ time
 
-const HOURS = [
-  [0, "Matins"], [5, "Lauds"], [8, "Terce"], [12, "Sext"], [14, "None"], [18, "Vespers"], [21, "Compline"],
-];
+const HOURS = [0, 5, 8, 12, 14, 18, 21]; // Matins, Lauds, Terce, Sext, None, Vespers, Compline
 export function hourName(d) {
   const h = d.getHours();
-  let n = HOURS[0][1];
-  for (const [at, name] of HOURS) if (h >= at) n = name;
-  return n;
+  let n = 0;
+  HOURS.forEach((at, i) => { if (h >= at) n = i; });
+  return t("hours")[n];
 }
 
 /** The sky's phase and colors for a time. */
@@ -127,9 +124,7 @@ export const isNight = (d) => sky(d).phase !== "jour";
 export const hhmm = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 // ------------------------------------------------------------------ quotas
-// Optional cduo integration: Claude accounts A and B, read only from the quota files
-// a local poller writes (~/.local/state/claude-duo/quota-{A,B}.json). Without those
-// files the header simply shows no quota plaques.
+// Claude accounts A and B, read only from the files the local poller writes.
 
 const STALE = 30 * 60e3;
 async function readQuota(acc) {
@@ -147,12 +142,12 @@ async function readQuota(acc) {
 }
 export const readQuotas = () => Promise.all([readQuota("A"), readQuota("B")]);
 
-/** "4d 12h", "3h 05", "12 min". */
+/** "4d 12h" (FR "4j 12h"), "3h 05", "12 min". */
 export function left(ms) {
   const d = ms - Date.now();
   if (!ms || d <= 0) return "";
   const m = Math.floor(d / 60e3), h = Math.floor(m / 60);
-  if (h >= 48) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h >= 48) return `${Math.floor(h / 24)}${t("days")} ${h % 24}h`;
   if (h >= 1) return `${h}h ${String(m % 60).padStart(2, "0")}`;
   return `${m} min`;
 }
@@ -183,13 +178,13 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"
 export function district(sp) {
   const h = hash(sp.id);
   const raw = String(sp.name ?? "");
-  const nom = raw === "~" ? "Home" : raw.replace(/^~\//, "").split("/").pop();
+  const nom = raw === "~" ? t("home") : raw.replace(/^~\//, "").split("/").pop();
   return {
     color: COLORS[h % COLORS.length],
     charge: CHARGES[(h >>> 4) % CHARGES.length],
     num: ROMAN[(sp.index ?? 1) - 1] ?? String(sp.index),
     nom,
-    titre: `District ${ROMAN[(sp.index ?? 1) - 1] ?? sp.index} · ${nom}`,
+    titre: t("district", ROMAN[(sp.index ?? 1) - 1] ?? sp.index, nom),
   };
 }
 
