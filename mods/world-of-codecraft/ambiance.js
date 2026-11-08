@@ -9,7 +9,7 @@
 // Frame swaps (stand/step, peck, wings) use an opacity loop pushed far outside 0..1 so it clamps to an
 // almost instant switch instead of a slow crossfade.
 
-import { zdiv as div, zimage as image, zsvg as svg } from "./zoom.js"; // world elements: zoomed in the immersive layout
+import { div, image, svg } from "gpui-kit";
 import { readQuotas, left as timeLeft } from "./kit.js";
 import { CREATURES } from "./creatures-data.js";
 import { FRONTS } from "./monde-data.js";

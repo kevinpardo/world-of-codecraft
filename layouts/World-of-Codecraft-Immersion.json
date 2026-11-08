@@ -38,22 +38,6 @@
       }
     },
     {
-      "id": "place",
-      "type": "block",
-      "size": {
-        "weight": 1
-      },
-      "content": {
-        "mod": "world-of-codecraft",
-        "props": {
-          "role": "place",
-          "immersion": true
-        }
-      },
-      "background": "#120c0e",
-      "min": 300
-    },
-    {
       "id": "bourg",
       "type": "row",
       "padding": [
@@ -63,131 +47,174 @@
       "gap": 6,
       "children": [
         {
-          "id": "tableau",
-          "type": "block",
+          "id": "gauche",
+          "type": "column",
           "size": {
             "px": 262
           },
           "min": 200,
           "max": 420,
-          "background": "#1d1410",
-          "content": {
-            "mod": "world-of-codecraft",
-            "props": {
-              "role": "tableau"
-            }
-          }
-        },
-        {
-          "id": "arene",
-          "type": "column",
-          "resizable": false,
           "children": [
             {
-              "id": "cadre-haut",
+              "id": "tableau",
               "type": "block",
               "size": {
-                "px": 14
+                "weight": 1
               },
+              "background": "#1d1410",
               "content": {
                 "mod": "world-of-codecraft",
                 "props": {
-                  "role": "rail",
-                  "side": "top"
+                  "role": "tableau"
                 }
               }
             },
             {
-              "id": "arene-milieu",
-              "type": "row",
-              "resizable": false,
-              "children": [
-                {
-                  "id": "cadre-gauche",
-                  "type": "block",
-                  "size": {
-                    "px": 14
-                  },
-                  "content": {
-                    "mod": "world-of-codecraft",
-                    "props": {
-                      "role": "rail",
-                      "side": "left"
-                    }
-                  }
-                },
-                {
-                  "id": "main",
-                  "type": "block",
-                  "padding": 6,
-                  "background": "#1a120e",
-                  "content": {
-                    "tab": "active",
-                    "pane": {
-                      "header": {
-                        "content": {
-                          "mod": "world-of-codecraft",
-                          "props": {
-                            "role": "pane"
-                          }
-                        },
-                        "height": 30,
-                        "position": "top",
-                        "reveal": "always"
-                      },
-                      "background": "background",
-                      "border": {
-                        "width": 2,
-                        "color": "#0b080c"
-                      },
-                      "focus": {
-                        "width": 2,
-                        "color": "#f2c25a"
-                      },
-                      "radius": 0,
-                      "gap": 6,
-                      "lone": true
-                    }
-                  }
-                },
-                {
-                  "id": "cadre-droite",
-                  "type": "block",
-                  "size": {
-                    "px": 14
-                  },
-                  "content": {
-                    "mod": "world-of-codecraft",
-                    "props": {
-                      "role": "rail",
-                      "side": "right"
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "id": "cadre-bas",
+              "id": "commande",
               "type": "block",
               "size": {
-                "px": 14
+                "px": 400
               },
               "content": {
                 "mod": "world-of-codecraft",
                 "props": {
-                  "role": "rail",
-                  "side": "bottom"
+                  "role": "commande"
                 }
               }
             }
           ]
+        },
+        {
+          "id": "droite",
+          "type": "column",
+          "children": [
+            {
+              "id": "place",
+              "type": "block",
+              "size": {
+                "weight": 1
+              },
+              "content": {
+                "mod": "world-of-codecraft",
+                "props": {
+                  "role": "place",
+                  "immersion": true
+                }
+              },
+              "background": "#120c0e"
+            },
+            {
+              "id": "arene",
+              "type": "column",
+              "resizable": false,
+              "children": [
+                {
+                  "id": "cadre-haut",
+                  "type": "block",
+                  "size": {
+                    "px": 14
+                  },
+                  "content": {
+                    "mod": "world-of-codecraft",
+                    "props": {
+                      "role": "rail",
+                      "side": "top"
+                    }
+                  }
+                },
+                {
+                  "id": "arene-milieu",
+                  "type": "row",
+                  "resizable": false,
+                  "children": [
+                    {
+                      "id": "cadre-gauche",
+                      "type": "block",
+                      "size": {
+                        "px": 14
+                      },
+                      "content": {
+                        "mod": "world-of-codecraft",
+                        "props": {
+                          "role": "rail",
+                          "side": "left"
+                        }
+                      }
+                    },
+                    {
+                      "id": "main",
+                      "type": "block",
+                      "padding": 6,
+                      "background": "#1a120e",
+                      "content": {
+                        "tab": "active",
+                        "pane": {
+                          "header": {
+                            "content": {
+                              "mod": "world-of-codecraft",
+                              "props": {
+                                "role": "pane"
+                              }
+                            },
+                            "height": 30,
+                            "position": "top",
+                            "reveal": "always"
+                          },
+                          "background": "background",
+                          "border": {
+                            "width": 2,
+                            "color": "#0b080c"
+                          },
+                          "focus": {
+                            "width": 2,
+                            "color": "#f2c25a"
+                          },
+                          "radius": 0,
+                          "gap": 6,
+                          "lone": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "cadre-droite",
+                      "type": "block",
+                      "size": {
+                        "px": 14
+                      },
+                      "content": {
+                        "mod": "world-of-codecraft",
+                        "props": {
+                          "role": "rail",
+                          "side": "right"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "cadre-bas",
+                  "type": "block",
+                  "size": {
+                    "px": 14
+                  },
+                  "content": {
+                    "mod": "world-of-codecraft",
+                    "props": {
+                      "role": "rail",
+                      "side": "bottom"
+                    }
+                  }
+                }
+              ],
+              "size": {
+                "px": 400
+              },
+              "min": 200,
+              "max": 900
+            }
+          ]
         }
-      ],
-      "size": {
-        "px": 380
-      },
-      "min": 200,
-      "max": 900
+      ]
     }
   ]
 }

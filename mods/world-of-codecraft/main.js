@@ -3,6 +3,7 @@
 //   tableau  the left column: districts (spaces) as pennants, the quest board (tabs)
 //   place    the bottom strip: the village square, heroes, fountains, chronicle
 //   pane     a pane's header: a stitched leather band with the hero working in it
+//   commande the command panel as its own block (immersive layout: under the board, beside the terminal)
 //   rail     one side of the carved frame around the terminals (props.side: top, bottom, left, right)
 
 import { View, div } from "gpui-kit";
@@ -11,6 +12,7 @@ import Fronton from "./fronton.js";
 import Tableau from "./tableau.js";
 import Place from "./place.js";
 import PaneHead from "./pane.js";
+import { Commande } from "./commande.js";
 import { rail } from "./ui.js";
 
 class Rail {
@@ -18,7 +20,7 @@ class Rail {
   render() { return rail(this.side); }
 }
 
-const ROLES = { fronton: Fronton, tableau: Tableau, place: Place, pane: PaneHead, rail: Rail };
+const ROLES = { fronton: Fronton, tableau: Tableau, place: Place, pane: PaneHead, rail: Rail, commande: Commande };
 
 export default class Valbrume extends View {
   init(p, cx) {

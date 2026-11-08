@@ -21,8 +21,8 @@ import { SPOTS, FIRE, REST, ROAD, BUILDINGS, market, SMOKE, GLOWS, LISIERE } fro
 import { t as tr, detectLang } from "./i18n.js";
 import { Activites } from "./activite.js";
 import { Ambiance, behind } from "./ambiance.js";
-import { zdiv, zimage, unwrap, setZoom } from "./zoom.js";
 import { commandPanel, MINI_INSET } from "./commande.js";
+import { EXT } from "./terre-data.js";
 
 const ART = "mods/world-of-codecraft/art";
 const MONDE = `${ART}/monde`;
@@ -82,6 +82,7 @@ export default class Place {
   init(_p, cx) {
     detectLang(cx);
     this.born = Date.now();
+    this.gotoAt = shared("wocc.goto")?.at; // ignore a minimap click left over from an earlier session
     this.w = 1400;
     this.camX = null;
     this.lastFocus = null;
@@ -212,7 +213,7 @@ export default class Place {
     const { w, h: hh, ax, ay } = an.info;
     const suffix = night ? "-n" : "";
     // the feet point moves (natively, linear, over the rest of the leg); everything hangs from it
-    let el = zdiv().id(`unite-${a.address}`).absolute().left(Math.round(u.leg ? u.leg.b[0] : u.x)).top(Math.round(u.leg ? u.leg.b[1] : u.y)).w(0).h(0);
+    let el = div().id(`unite-${a.address}`).absolute().left(Math.round(u.leg ? u.leg.b[0] : u.x)).top(Math.round(u.leg ? u.leg.b[1] : u.y)).w(0).h(0);
     // always declared (16 ms when standing): GPUI animates only changes made after the transition exists,
     // so adding it on the render that sets the first leg's target made that leg jump
     {
@@ -220,50 +221,50 @@ export default class Place {
       el = el.transition("left", { duration: dur, easing: "linear" }).transition("top", { duration: dur, easing: "linear" });
     }
     // rings under the feet
-    if (selected) el = el.child(zimage(`${MONDE}/ring-selected.png`).absolute().left(-30).top(-17).w(60).h(33));
-    if (st === "blocked" && !u.leg) el = el.child(zimage(`${MONDE}/ring-blocked.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.2, to: 1, period: 460 })));
-    if (st === "done" && !u.leg) el = el.child(zimage(`${MONDE}/ring-done.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.45, to: 1, period: 1100 })));
+    if (selected) el = el.child(image(`${MONDE}/ring-selected.png`).absolute().left(-30).top(-17).w(60).h(33));
+    if (st === "blocked" && !u.leg) el = el.child(image(`${MONDE}/ring-blocked.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.2, to: 1, period: 460 })));
+    if (st === "done" && !u.leg) el = el.child(image(`${MONDE}/ring-done.png`).absolute().left(-30).top(-17).w(60).h(33).when(this.live, (e) => e.loop("opacity", { from: 0.45, to: 1, period: 1100 })));
 
     // the sprite: every frame of the anim stacked (preloaded), only the current one shown
     let body;
     if (an.frames) {
       const dir = `${ART}/heros/${u.key}/${an.name}`;
       const k = animate ? Math.floor(((t + (hash(a.address) % 997)) / 1000) * an.info.fps) % an.info.n : 0;
-      body = zdiv().absolute().left(-ax).top(-ay).w(w).h(hh)
+      body = div().absolute().left(-ax).top(-ay).w(w).h(hh)
         .children(Array.from({ length: an.info.n }, (_, i) =>
-          zimage(`${dir}/${String(i).padStart(2, "0")}${suffix}.png`).absolute().left(0).top(0).w(w).h(hh).opacity(i === k ? 1 : 0)));
+          image(`${dir}/${String(i).padStart(2, "0")}${suffix}.png`).absolute().left(0).top(0).w(w).h(hh).opacity(i === k ? 1 : 0)));
     } else {
       // no frames yet: the standing sprite, breathing (1 px) or bobbing while it walks
-      body = zdiv().absolute().left(-ax).top(-ay).w(w).h(hh)
-        .child(zimage(`${ART}/heros/${u.key}/stand${suffix}.png`).absolute().left(0).top(0).w(w).h(hh)
+      body = div().absolute().left(-ax).top(-ay).w(w).h(hh)
+        .child(image(`${ART}/heros/${u.key}/stand${suffix}.png`).absolute().left(0).top(0).w(w).h(hh)
           .when(this.live, (e) => e.loop("top", u.leg ? { from: 0, to: -2, period: 380 } : { from: 0, to: -1, period: 2600 + (hash(a.address) % 900) })));
     }
     el = el.child(body);
 
     // hit box, tooltip, click
-    el = el.child(zdiv().id(`clic-${a.address}`).absolute().left(-ax).top(-ay).w(w).h(hh).cursor_pointer()
+    el = el.child(div().id(`clic-${a.address}`).absolute().left(-ax).top(-ay).w(w).h(hh).cursor_pointer()
       .tooltip(tr("unitTip", heroTitle(h), h.prog, `${a.space_name ?? ""} › ${a.tab_name ?? ""}`, QUEST[st]?.mot ?? tr("onGuardTerm")))
       .on_mouse_down("left", stop)
       .on_click(() => (a.guard ? run("pane.focus", { pane: a.pane }) : run("agent.focus", { terminal: a.address }))));
 
     const head = -ay;
     if (st === "blocked" && !u.leg) {
-      el = el.child(zimage(`${MONDE}/m-blocked.png`).absolute().left(-12).top(head - 42).w(24).h(38)
+      el = el.child(image(`${MONDE}/m-blocked.png`).absolute().left(-12).top(head - 42).w(24).h(38)
         .when(this.live, (e) => e.loop("top", { from: head - 42, to: head - 50, period: 500 })).when(this.live, (e) => e.loop("opacity", { from: 0.35, to: 1, period: 520 })));
-      el = el.child(zdiv().absolute().left(18).top(head - 4).h(22).px(6).rounded(3).bg(C.parch).border_2().border_color(C.woodDark)
+      el = el.child(div().absolute().left(18).top(head - 4).h(22).px(6).rounded(3).bg(C.parch).border_2().border_color(C.woodDark)
         .flex().items_center().whitespace_nowrap().font_family(UI).text_size(15).text_color(C.wax)
         .when(this.live, (e) => e.frames(tr("help"), 900)).when(!this.live, (e) => e.child(tr("help")[0])));
     }
     if (st === "done" && !u.leg) {
-      el = el.child(zimage(`${MONDE}/m-done.png`).absolute().left(-14).top(head - 42).w(28).h(38).when(this.live, (e) => e.loop("top", { from: head - 40, to: head - 48, period: 900 })));
-      el = el.child(zdiv().absolute().left(-22).top(head + 10).size(3).bg(C.goldLight).when(this.live, (e) => e.loop("top", { from: head + 30, to: head - 6, period: 1000 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1000 })));
-      el = el.child(zdiv().absolute().left(20).top(head + 20).size(3).bg("#fff2c0").when(this.live, (e) => e.loop("top", { from: head + 40, to: head + 2, period: 1300 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1300 })));
+      el = el.child(image(`${MONDE}/m-done.png`).absolute().left(-14).top(head - 42).w(28).h(38).when(this.live, (e) => e.loop("top", { from: head - 40, to: head - 48, period: 900 })));
+      el = el.child(div().absolute().left(-22).top(head + 10).size(3).bg(C.goldLight).when(this.live, (e) => e.loop("top", { from: head + 30, to: head - 6, period: 1000 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1000 })));
+      el = el.child(div().absolute().left(20).top(head + 20).size(3).bg("#fff2c0").when(this.live, (e) => e.loop("top", { from: head + 40, to: head + 2, period: 1300 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 1300 })));
     }
-    if (st === "idle" && !u.leg) el = el.child(zimage(`${ART}/z.svg`).absolute().left(14).top(head).size(8).when(this.live, (e) => e.loop("top", { from: head + 10, to: head - 14, period: 2600 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 2600 })));
+    if (st === "idle" && !u.leg) el = el.child(image(`${ART}/z.svg`).absolute().left(14).top(head).size(8).when(this.live, (e) => e.loop("top", { from: head + 10, to: head - 14, period: 2600 })).when(this.live, (e) => e.loop("opacity", { from: 1, to: 0, period: 2600 })));
     if (!u.leg && !a.guard) el = el.children(this.act.layers(u, head, night, t));
     if (selected) {
-      el = el.child(zdiv().absolute().left(-15).top(head - 9).w(30).h(5).bg("#1b1420").border_1().border_color("#000000")
-        .child(zdiv().h_full().w(st === "blocked" ? 8 : 28).bg(st === "blocked" ? "#e5685a" : "#7dff6a")));
+      el = el.child(div().absolute().left(-15).top(head - 9).w(30).h(5).bg("#1b1420").border_1().border_color("#000000")
+        .child(div().h_full().w(st === "blocked" ? 8 : 28).bg(st === "blocked" ? "#e5685a" : "#7dff6a")));
     }
     return el;
   }
@@ -306,7 +307,7 @@ export default class Place {
     SMOKE.forEach(([sx, sy], n) => {
       for (let k = 0; k < 3; k++) {
         const x0 = sx - 4, y0 = sy - 8, p = 2800 + k * 520 + n * 130;
-        out.push(zdiv().absolute().left(x0).top(y0).size(7 + k * 2).rounded_full().bg(k === 1 ? "#b9b4bfbb" : "#d8d4dcbb")
+        out.push(div().absolute().left(x0).top(y0).size(7 + k * 2).rounded_full().bg(k === 1 ? "#b9b4bfbb" : "#d8d4dcbb")
           .when(this.live, (e) => e.loop("top", { from: y0, to: y0 - 44 - k * 10, period: p, easing: "linear" }))
           .when(this.live, (e) => e.loop("left", { from: x0, to: x0 + 10 + k * 6, period: p, easing: "linear" }))
           .when(this.live, (e) => e.loop("opacity", { from: 0.85, to: 0, period: p, easing: "linear" })));
@@ -319,7 +320,7 @@ export default class Place {
     if (nightK <= 0) return [];
     return GLOWS.map((g) => {
       const s = g.size;
-      return zdiv().absolute().left(g.at[0] - s / 2).top(g.at[1] - s / 2).size(s).rounded_full().bg(`${g.color}22`)
+      return div().absolute().left(g.at[0] - s / 2).top(g.at[1] - s / 2).size(s).rounded_full().bg(`${g.color}22`)
         .opacity(nightK).when(this.live, (e) => e.loop("opacity", { from: 0.35 * nightK, to: nightK, period: g.period }));
     });
   }
@@ -327,7 +328,7 @@ export default class Place {
   hitboxes() {
     return Object.entries(BUILDINGS).map(([k, b]) => {
       const r = RECRUIT[k];
-      let el = zdiv().id(`bat-${k}`).absolute().left(b.box[0]).top(b.box[1]).w(b.box[2]).h(b.box[3])
+      let el = div().id(`bat-${k}`).absolute().left(b.box[0]).top(b.box[1]).w(b.box[2]).h(b.box[3])
         .tooltip(r ? tr("recruitTip", b.nom, r.what) : b.nom);
       if (r) el = el.on_click((e) => { if (e.click_count === 2) run("tab.new", r.argv ? { argv: r.argv } : {}); });
       return el;
@@ -336,13 +337,30 @@ export default class Place {
 
   /** A front cut-out (the object's own baked pixels), crossfaded like the world. */
   front(f, nightK) {
-    let el = zdiv().absolute().left(f.x).top(f.y).w(f.w).h(f.h);
-    if (nightK < 1) el = el.child(zimage(`${MONDE}/avant-${f.key}-jour.png`).absolute().left(0).top(0).w(f.w).h(f.h));
-    if (nightK > 0) el = el.child(zimage(`${MONDE}/avant-${f.key}-nuit.png`).absolute().left(0).top(0).w(f.w).h(f.h).opacity(nightK));
+    let el = div().absolute().left(f.x).top(f.y).w(f.w).h(f.h);
+    if (nightK < 1) el = el.child(image(`${MONDE}/avant-${f.key}-jour.png`).absolute().left(0).top(0).w(f.w).h(f.h));
+    if (nightK > 0) el = el.child(image(`${MONDE}/avant-${f.key}-nuit.png`).absolute().left(0).top(0).w(f.w).h(f.h).opacity(nightK));
     return el;
   }
 
   // ---------------------------------------------------------------- the panel
+
+  /** Immersive layout: the command panel is another block (commande.js, role "commande"). Tell it where the
+   *  camera and the units are (store key wocc.view, only when it changes, at most every 300 ms) and obey its
+   *  minimap clicks (wocc.goto). */
+  bridge(units, vw) {
+    const g = shared("wocc.goto");
+    if (g && g.at !== this.gotoAt) {
+      this.gotoAt = g.at;
+      this.camX = g.x - vw / 2;
+      if (typeof g.y === "number") this.camY = g.y;
+      this.manual = true;
+    }
+    const view = { cam: Math.round(this.cam(vw)), vw: Math.round(vw), dots: units.map((u) => [Math.round(u.x / 8) * 8, Math.round(u.y / 8) * 8, u.a.status]) };
+    const key = JSON.stringify(view);
+    const now = Date.now();
+    if (key !== this.viewKey && now - (this.viewAt ?? 0) > 300) { this.viewKey = key; this.viewAt = now; setShared("wocc.view", view); }
+  }
 
   minimap(units, vw) {
     const mw = PANEL - MINI_INSET, k = mw / WORLD.w, mh = Math.round(WORLD.h * k);
@@ -363,6 +381,14 @@ export default class Place {
         return d;
       }))
       .child(div().absolute().left(vx).top(0).w(view).h(mh).border_1().border_color("#ffffff"));
+  }
+
+  /** Immersive layout: the world y at the top of the view, kept inside the painted bands. */
+  camV() {
+    const h = this.h ?? WORLD.h, top = -EXT.nord, bottom = WORLD.h + EXT.sud;
+    if (h >= bottom - top) return (top + bottom - h) / 2;
+    const c = this.camY ?? (WORLD.h / 2 - 40 - h / 2);
+    return Math.max(top, Math.min(bottom - h, c));
   }
 
   cam(vw) {
@@ -435,14 +461,15 @@ export default class Place {
     // the selected unit = the focused agent (or the focused shell)
     const f = focused();
     const sel = units.find((u) => u.a.address === (f?.agent ?? f?.terminal)) ?? units.find((u) => u.a.focused) ?? null;
-    // the immersive layout shows the world bigger, filling the block's height (world units below)
-    const Z = props()?.immersion ? Math.max(1, (this.h ?? WORLD.h) / WORLD.h) : 1;
-    setZoom(Z);
-    const vw = Math.max(200, this.w - PANEL) / Z; // visible world width, in world units
+    // immersive layout: the command panel is its own block (role "commande"), the village takes the full width
+    const imm = Boolean(props()?.immersion);
+    const vw = Math.max(200, this.w - (imm ? 0 : PANEL));
+    if (imm) this.bridge(units, vw);
     if (sel && sel.a.address !== this.lastFocus) {
       this.lastFocus = sel.a.address;
       this.manual = false; // a new selection takes the camera back
       this.camX = sel.x - vw / 2; // glide to the selected unit
+      if (imm) this.camY = sel.y - 60 - (this.h ?? WORLD.h) / 2; // and bring the village back into view
     } else if (sel?.leg && !this.manual) this.camX = sel.x - vw / 2; // and follow it while it walks
     const camX = this.cam(vw);
 
@@ -477,46 +504,64 @@ export default class Place {
     }
     things.sort((p, q) => p.z - q.z);
 
-    const worldTop = Math.round(((this.h ?? WORLD.h) - WORLD.h * Z) / 2);
+    // immersive layout: the painted bands around the village (terre-data.js) and a vertical camera too
+    const worldTop = imm ? -this.camV() : Math.round(((this.h ?? WORLD.h) - WORLD.h) / 2);
+    const glide = this.drag ? { duration: 16, easing: "linear" } : { duration: 650, easing: "ease-in-out" };
+    const band = (name, y) => [
+      ...EXT.tiles.map((k) => image(`${MONDE}/${name}-${k}-jour.png`).absolute().left(k * 1000).top(y).w(1000).h(EXT[name])),
+      ...(nightK > 0 ? EXT.tiles.map((k) => image(`${MONDE}/${name}-${k}-nuit.png`).absolute().left(k * 1000).top(y).w(1000).h(EXT[name]).opacity(nightK)) : []),
+    ];
+    const seam = (name, y) => {
+      const top = y - EXT.seamUp, h = EXT.seamUp + EXT.seamDown;
+      const out = [];
+      if (nightK < 1) out.push(image(`${MONDE}/lisiere-${name}-jour.png`).absolute().left(0).top(top).w(WORLD.w).h(h));
+      if (nightK > 0) out.push(image(`${MONDE}/lisiere-${name}-nuit.png`).absolute().left(0).top(top).w(WORLD.w).h(h).opacity(nightK));
+      return out;
+    };
     // the camera glides (650 ms) except while the view is dragged, where it follows the pointer
-    const layer = (id) => zdiv().id(id).absolute().top(worldTop / Z).left(-camX).w(WORLD.w).h(WORLD.h)
-      .transition("left", this.drag ? { duration: 16, easing: "linear" } : { duration: 650, easing: "ease-in-out" });
+    const layer = (id) => div().id(id).absolute().top(worldTop).left(-camX).w(WORLD.w).h(WORLD.h)
+      .transition("left", glide).transition("top", glide);
     const world = layer("monde")
-      .children(TILES.map((tl) => zimage(`${MONDE}/jour-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h)))
-      .when(nightK > 0, (el) => el.children(TILES.map((tl) => zimage(`${MONDE}/nuit-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h).opacity(nightK))))
+      .when(imm, (el) => el.children(band("nord", -EXT.nord)).children(band("sud", WORLD.h)))
+      .children(TILES.map((tl) => image(`${MONDE}/jour-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h)))
+      .when(nightK > 0, (el) => el.children(TILES.map((tl) => image(`${MONDE}/nuit-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h).opacity(nightK))))
       .children(this.glows(nightK))
       .children(this.hitboxes())
+      .when(imm, (el) => el.children(seam("nord", 0)))
       .children(things.map((th) => th.el))
+      .when(imm, (el) => el.children(seam("sud", WORLD.h))) // nearer the viewer than anyone in the village
       .children(this.smoke());
 
-    const panel = commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) });
+    const panel = imm ? null : commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) });
 
     return h_flex().id("place").size_full().bg(C.slate)
       .on_size_change((s, cx) => {
         if (Math.abs(s.width - this.w) > 10 || s.height !== this.h) { this.w = s.width; this.h = s.height; cx.notify(); }
       })
-      .child(panel)
+      .when(!imm, (el) => el.child(panel))
       .child(div().id("vue").flex_1().h_full().relative().overflow_hidden().bg("#3f6b2c")
         .on_scroll_wheel((e, cx) => {
-          const d = Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y;
-          this.camX = this.cam(vw) - d / Z;
+          if (imm) { this.camX = this.cam(vw) - e.delta.x; this.camY = this.camV() - e.delta.y; }
+          else this.camX = this.cam(vw) - (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y);
           this.manual = true;
           cx.notify();
         })
         // click and drag the village to pan (units and buttons stop the press, so their clicks still work)
         .when(!this.drag, (e) => e.cursor_grab()).when(Boolean(this.drag), (e) => e.cursor_grabbing())
-        .on_mouse_down("left", (e, cx) => { this.drag = { x0: e.position.x, cam0: this.cam(vw) }; cx.notify(); })
+        .on_mouse_down("left", (e, cx) => { this.drag = { x0: e.position.x, y0: e.position.y, cam0: this.cam(vw), camY0: this.camV() }; cx.notify(); })
         .on_mouse_move((e, cx) => {
           if (!this.drag) return;
-          const x = Math.max(0, Math.min(Math.max(0, WORLD.w - vw), this.drag.cam0 - (e.position.x - this.drag.x0) / Z));
-          if (Math.abs(x - this.cam(vw)) < 1) return;
+          const x = Math.max(0, Math.min(Math.max(0, WORLD.w - vw), this.drag.cam0 - (e.position.x - this.drag.x0)));
+          const y = imm ? this.drag.camY0 - (e.position.y - this.drag.y0) : 0;
+          if (Math.abs(x - this.cam(vw)) < 1 && (!imm || Math.abs(y - this.camV()) < 1)) return;
           this.camX = x;
+          if (imm) this.camY = y;
           this.manual = true;
           cx.notify();
         })
         .on_mouse_up("left", (_e, cx) => { if (this.drag) { this.drag = null; cx.notify(); } })
         .on_hover((over, cx) => { if (!over && this.drag) { this.drag = null; cx.notify(); } })
-        .child(unwrap(world))
+        .child(world)
         .child(this.chronicle()));
   }
 }

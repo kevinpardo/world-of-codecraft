@@ -60,3 +60,52 @@ export function commandPanel(width, minimap, sel, anim = null) {
       .child(card(sel)))
     .children(frame("cadre"));
 }
+
+// ------------------------------------------------------------------ the panel as its own block
+
+import { image } from "gpui-kit";
+import { agents, focused, shared, setShared } from "herdr";
+import { heroOf, guards, C as KC } from "./kit.js";
+import { WORLD } from "./monde-data.js";
+
+const MONDE = "mods/world-of-codecraft/art/monde";
+const DOT = { blocked: KC.quest, done: KC.gold, working: "#7dff6a", idle: "#cfc8da", garde: "#9aa4b1" };
+
+/** Role "commande" (immersive layout): the command panel beside the terminal, under the board. The village
+ *  is another block, so the minimap reads its camera and units from the store (wocc.view, written by
+ *  place.js) and a click asks it to move there (wocc.goto). */
+export class Commande {
+  init() { this.w = 262; }
+
+  minimap() {
+    const v = shared("wocc.view") ?? { cam: 0, vw: 1200, dots: [] };
+    const mw = this.w - MINI_INSET, k = mw / WORLD.w, mh = Math.round(WORLD.h * k);
+    return div().id("minicarte").relative().w(mw).h(mh).flex_none().cursor_pointer()
+      .tooltip(t("mapTip"))
+      .on_mouse_down("left", (e, cx) => {
+        const lx = e.local_position?.x;
+        if (typeof lx === "number") setShared("wocc.goto", { x: (lx / mw) * WORLD.w, at: Date.now() });
+        cx.stop_propagation();
+      })
+      .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
+      .children((v.dots ?? []).map(([x, y, st]) => div().absolute().left(x * k - 2).top(Math.min(WORLD.h, Math.max(0, y)) * k - 3).size(4)
+        .bg(DOT[st] ?? "#ffffff").border_1().border_color("#000000")))
+      .child(div().absolute().left((v.cam / WORLD.w) * mw).top(0).w((v.vw / WORLD.w) * mw).h(mh).border_1().border_color("#ffffff"));
+  }
+
+  /** The selected unit, as place.js picks it: the focused agent, else the focused shell. */
+  selected() {
+    const f = focused();
+    const want = f?.agent ?? f?.terminal;
+    const a = agents().find((x) => x.address === want)
+      ?? guards().map((p) => ({ address: p.terminal, pane: p.pane, guard: true, status: "garde", program: p.program, tab_name: p.title, focused: p.focused })).find((x) => x.address === want);
+    return a ? { a, h: heroOf(a.address, a.program) } : null;
+  }
+
+  render() {
+    const on = shared("wocc.anim") !== false;
+    return div().id("commande-bloc").size_full()
+      .on_size_change((s, cx) => { if (Math.abs(s.width - this.w) > 2) { this.w = s.width; cx.notify(); } })
+      .child(commandPanel(this.w, this.minimap(), this.selected(), { on, toggle: () => setShared("wocc.anim", !on) }));
+  }
+}

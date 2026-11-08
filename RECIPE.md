@@ -131,14 +131,21 @@ the clock. The art is original: it imitates no existing game.
 
 ## Immersive mode
 
-A second layout, `World-of-Codecraft-Immersion`: header, then the village filling the window
-(`place`, weight 1, `props.immersion: true`), then the board and the terminal in a 380 px band
-below (resizable). The header's « Immersion » / « Atelier » (Workshop) button and ctrl-shift-i
-switch between the two layouts (`layout.switch`; mods restart, the village keeps nothing but
-its chronicle). In immersion the world is drawn Z = height / 400 times bigger: GPUI has no scale
-transform, so `zoom.js` gives the world builders (`zdiv`, `zimage`, `zsvg`) that multiply every
-length (positions, sizes, paddings, text, left/top loops) by Z; the camera math works in world
-units (visible width = view width / Z). The minimap, chronicle and command panel stay 1×.
+A second layout, `World-of-Codecraft-Immersion`: the left column keeps the board on top and the command
+panel below (its own block, role `commande`, 400 px); on the right the village and the terminal swap
+places: the village fills the space above (`place`, weight 1, `props.immersion: true`, no panel inside),
+the framed terminal sits below (400 px, resizable). The header's « Immersion » / « Atelier » (Workshop)
+button and ctrl-shift-i switch layouts (`layout.switch`; mods restart, the chronicle stays).
+- **No zoom: more map.** The village keeps its size; `tools/extend_world.py` paints a 400 px band north
+  (a forest getting denser away from the village, the two dirt paths continued) and south (a meadow with
+  oaks, bushes and rocks, the river flowing on down-left) from the village's own grass samples and
+  cut-outs, colour-matched to the village's edges, with soft feathered borders and a row of trees /
+  bushes standing across each seam (`lisiere-*`; the south one is drawn above the units). Night versions
+  come from a day-to-night colour map fitted on the baked tiles. The village pixels are never touched.
+- **Camera:** horizontal and vertical (drag, two-axis wheel), kept inside the bands; selecting a hero
+  brings the village back into view.
+- **Panel bridge:** the village publishes its camera and units to the store (`wocc.view`, only when
+  they change, at most every 300 ms); the panel's minimap reads it and a click writes `wocc.goto`.
 
 ## Built from
 
