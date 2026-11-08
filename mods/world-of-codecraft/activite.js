@@ -42,7 +42,7 @@ export const DISTRICT = { atelier: ["golem", "gobelin"], grange: ["loup", "sangl
 const HOME = { artificier: "atelier", rodeur: "grange", pretre: "temple", voleur: "etal1" };
 const clsOf = (a) => (a.demoHero ? { mage: "mage", artificer: "artificier", ranger: "rodeur", priest: "pretre", rogue: "voleur", warrior: "guerrier" }[a.demoHero.split("-")[1]] : heroOf(a.address, a.program).cls);
 const RESULT = 5000; // a test result stays on screen this long
-const SCENE_OF = { pense: "pense", eclaire: "eclaire", web: "eclaire", code: "combat", commande: "travail", medite: "medite", test: "test" };
+const SCENE_OF = { pense: "pense", eclaire: "eclaire", web: "eclaire", code: "combat", commande: "combat", medite: "medite", test: "test" };
 const boss = (s) => (s?.errTache ?? 0) >= BOSS_AFTER;
 const blowsFor = (s) => (boss(s) ? BOSS_BLOWS : BLOWS);
 const recent = (t, ms) => Boolean(t) && Date.now() - t < ms;

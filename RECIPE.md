@@ -70,8 +70,11 @@ the clock. The art is original: it imitates no existing game.
   a straight line. Farther ones follow the road, with a 4-direction walk animation.
   Each road leg is a native `left`/`top` transition.
 - **Selection:** the selected unit is the focused agent. It gets a green ring and a
-  health bar, and the camera glides to it. The scroll wheel pans, and clicking the
-  minimap moves the view.
+  health bar, and the camera glides to it (and follows it while it walks).
+- **Camera:** click and drag the village to pan (the camera follows the pointer with no
+  glide while dragging), or use the scroll wheel or a minimap click. Any manual pan stops
+  the follow until another unit is selected. Units and buttons stop the press, so their
+  clicks still work.
 - **Clicks:**
   - a unit: `agent.focus` (`pane.focus` for shells)
   - double-click the tower, the forge or the barracks: recruit with `tab.new` (claude,
@@ -97,15 +100,17 @@ the clock. The art is original: it imitates no existing game.
 - **What a hero is doing**, not just its state: while Herdr says `working`, the hero plays
   a scene read from `~/.local/state/world-of-codecraft/<terminal address>.json`, written by
   the optional integrations (`integrations/claude-code/wocc-activity.py`, an async Claude
-  Code hook; `integrations/opencode/wocc-activity.js`, an OpenCode plugin). Fields: `act`,
+  Code hook; `integrations/opencode/wocc-activity.js`, an OpenCode plugin). Tests, commits
+  and pushes are recognised only as real commands (start of line or after `;` `&` `|` `(`),
+  with heredoc bodies and quoted strings removed first, so "git push" in a message doesn't count. Fields: `act`,
   `outil`, `coups`, `err` / `errT`, `errTache`, `subs`, `tache`, `essai {ok, t}`,
   `commitT`, `pushT`. Without them heroes keep the plain status behaviour.
   - thinking: `idle` + a "· · ·" bubble;
   - reading / searching / web: walks to a scout spot at the forest edge near its building
     (`LISIERE` in lieux.js), two ravens circling;
-  - editing code: fights a creature drawn per task (mages: imp, wolf, goblin, boar, rust
+  - editing code or running commands: fights a creature drawn per task (mages: imp, wolf, goblin, boar, rust
     golem, spectre; other classes: their district's beasts, `DISTRICT` in activite.js). Each
-    successful edit is a blow (hit pose + flash), 4 fell it (puff) and the next one comes;
+    successful edit or command is a blow (hit pose + flash), 4 fell it (puff) and the next one comes;
     3+ failed tools in a task bring the forest troll, a boss of 8 blows. A failed tool hits
     the hero (red flash, "Ouch!");
   - running tests: a training dummy beside the hero, struck while they run; the result stays

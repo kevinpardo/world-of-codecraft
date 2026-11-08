@@ -5,9 +5,9 @@ Claude Code hook (async, never blocks). Writes ~/.local/state/world-of-codecraft
 ~/.config/herdr-app/mods/world-of-codecraft/activite.js to pick the hero's scene while Herdr says "working".
 
   act      pense (thinking) | eclaire (reading/searching) | code (editing) | commande (bash)
-           | web (web search/fetch) | medite (compacting) | fini (turn over)
+           | test (running tests) | web (web search/fetch) | medite (compacting) | fini (turn over)
   outil    last tool name          t      last event (ms)       depuis  when act started (ms)
-  coups    successful edits this task (each one = a blow on the creature)
+  coups    successful edits and commands this task (each one = a blow on the creature)
   err      consecutive tool failures, errT the last one (ms)
   subs     running subagents       tache  prompt counter (seeds the creature drawn for the task)
   errTache tool failures this task (3+ = the next creature is a boss)
@@ -35,9 +35,14 @@ tool = ev.get("tool_name") or ""
 sub = bool(ev.get("agent_id"))
 now = int(time.time() * 1000)
 cmd = str((ev.get("tool_input") or {}).get("command") or "") if tool == "Bash" else ""
-TEST = re.compile(r"(^|[\s;&|(])((bun|npm|pnpm|yarn|npx|bunx)\s+(run\s+)?test|vitest|jest|pytest|playwright\s+test|cargo\s+test|go\s+test|rspec|phpunit|mix\s+test|deno\s+test)\b")
-COMMIT = re.compile(r"\bgit\s+(-C\s+\S+\s+)?commit\b")
-PUSH = re.compile(r"\bgit\s+(-C\s+\S+\s+)?push\b")
+# drop heredoc bodies and quoted strings: only the commands themselves count
+cmd = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n.*?\n\s*\1\b", " ", cmd, flags=re.S)
+cmd = re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", cmd)
+# only real commands: at the start of the command line or after ; & | ( (not inside quoted text or heredocs)
+AT = r"(?:^|[;&|(]\s*)(?:\w+=\S+\s+)*"
+TEST = re.compile(AT + r"((bun|npm|pnpm|yarn|npx|bunx)\s+(run\s+)?test|vitest|jest|pytest|playwright\s+test|cargo\s+test|go\s+test|rspec|phpunit|mix\s+test|deno\s+test)\b", re.M)
+COMMIT = re.compile(AT + r"git\s+(-C\s+\S+\s+)?commit\b", re.M)
+PUSH = re.compile(AT + r"git\s+(-C\s+\S+\s+)?push\b", re.M)
 
 READ = {"Read", "Grep", "Glob", "LS", "NotebookRead", "LSP", "ToolSearch"}
 EDIT = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
@@ -92,7 +97,7 @@ with open(os.path.join(DIR, ".lock"), "w") as lk:
             act(k)
         s["outil"] = tool
     elif name == "PostToolUse":
-        if tool in EDIT:
+        if tool in EDIT or tool == "Bash":  # every successful edit or command is a blow on the creature
             s["coups"] = s.get("coups", 0) + 1
         s["err"] = 0
         if TEST.search(cmd):

@@ -11,9 +11,11 @@ import path from "node:path";
 const READ = new Set(["read", "grep", "glob", "list", "lsp", "codesearch"]);
 const EDIT = new Set(["edit", "write", "patch", "multiedit"]);
 const WEB = new Set(["webfetch", "websearch"]);
-const TEST = /(^|[\s;&|(])((bun|npm|pnpm|yarn|npx|bunx)\s+(run\s+)?test|vitest|jest|pytest|playwright\s+test|cargo\s+test|go\s+test|rspec|phpunit|mix\s+test|deno\s+test)\b/;
-const COMMIT = /\bgit\s+(-C\s+\S+\s+)?commit\b/;
-const PUSH = /\bgit\s+(-C\s+\S+\s+)?push\b/;
+// only real commands: at the start of the command line or after ; & | ( (not inside quoted text or heredocs)
+const AT = String.raw`(?:^|[;&|(]\s*)(?:\w+=\S+\s+)*`;
+const TEST = new RegExp(AT + String.raw`((bun|npm|pnpm|yarn|npx|bunx)\s+(run\s+)?test|vitest|jest|pytest|playwright\s+test|cargo\s+test|go\s+test|rspec|phpunit|mix\s+test|deno\s+test)\b`, "m");
+const COMMIT = new RegExp(AT + String.raw`git\s+(-C\s+\S+\s+)?commit\b`, "m");
+const PUSH = new RegExp(AT + String.raw`git\s+(-C\s+\S+\s+)?push\b`, "m");
 
 export const WoccActivityPlugin = async () => {
   const term = process.env.HC_TERMINAL_ID;
@@ -49,7 +51,10 @@ export const WoccActivityPlugin = async () => {
     "tool.execute.before": async (input, output) => {
       if (input?.sessionID && children.has(input.sessionID)) return;
       const tool = String(input?.tool ?? "");
-      const cmd = tool === "bash" ? String(output?.args?.command ?? "") : "";
+      // drop heredoc bodies and quoted strings: only the commands themselves count
+      const cmd = tool === "bash" ? String(output?.args?.command ?? "")
+        .replace(/<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1\b/g, " ")
+        .replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, "''") : "";
       if (cmd) commands.set(input.callID, cmd);
       update((s, act) => {
         const k = kind(tool, cmd);
@@ -72,7 +77,7 @@ export const WoccActivityPlugin = async () => {
           if (TEST.test(cmd)) s.essai = { ok: false, t: now };
           return;
         }
-        if (EDIT.has(tool)) s.coups = (s.coups ?? 0) + 1;
+        if (EDIT.has(tool) || tool === "bash") s.coups = (s.coups ?? 0) + 1; // every edit or command = a blow
         s.err = 0;
         if (TEST.test(cmd)) s.essai = { ok: true, t: now };
         if (COMMIT.test(cmd)) s.commitT = now;

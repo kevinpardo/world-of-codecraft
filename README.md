@@ -11,8 +11,8 @@ in Valbrume, a village drawn in isometric pixel art, built around one big termin
 - **The village shows what each hero is doing.** A hero who needs you raises a flashing
   `!`. A hero who has finished shows a golden `?`. Idle heroes sit around the campfire.
 - **With the optional activity integration, heroes act out the work itself.** A hero
-  reading code scouts at the forest edge under circling ravens. Editing code, it fights a
-  creature (imp, wolf, goblin, boar, rust golem, spectre), one blow per successful edit; a
+  reading code scouts at the forest edge under circling ravens. Editing code or running
+  commands, it fights a creature (imp, wolf, goblin, boar, rust golem, spectre), one blow per successful edit; a
   task full of failures brings a troll boss. Tests are a training dummy, a commit gets a wax
   seal, a push sends a carrier pigeon, compaction is meditation, and every subagent is a
   wisp.

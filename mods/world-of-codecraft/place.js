@@ -352,7 +352,7 @@ export default class Place {
       .tooltip(tr("mapTip"))
       .on_mouse_down("left", (e, cx) => {
         const lx = e.local_position?.x;
-        if (typeof lx === "number") { this.camX = (lx / mw) * WORLD.w - vw / 2; cx.notify(); }
+        if (typeof lx === "number") { this.camX = (lx / mw) * WORLD.w - vw / 2; this.manual = true; cx.notify(); }
         cx.stop_propagation();
       })
       .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
@@ -437,8 +437,9 @@ export default class Place {
     const vw = Math.max(200, this.w - PANEL);
     if (sel && sel.a.address !== this.lastFocus) {
       this.lastFocus = sel.a.address;
+      this.manual = false; // a new selection takes the camera back
       this.camX = sel.x - vw / 2; // glide to the selected unit
-    } else if (sel?.leg) this.camX = sel.x - vw / 2; // and follow it while it walks
+    } else if (sel?.leg && !this.manual) this.camX = sel.x - vw / 2; // and follow it while it walks
     const camX = this.cam(vw);
 
     // frame animation: visible units with frames, or any walking unit
@@ -473,8 +474,9 @@ export default class Place {
     things.sort((p, q) => p.z - q.z);
 
     const worldTop = Math.round(((this.h ?? WORLD.h) - WORLD.h) / 2);
+    // the camera glides (650 ms) except while the view is dragged, where it follows the pointer
     const layer = (id) => div().id(id).absolute().top(worldTop).left(-camX).w(WORLD.w).h(WORLD.h)
-      .transition("left", { duration: 650, easing: "ease-in-out" });
+      .transition("left", this.drag ? { duration: 16, easing: "linear" } : { duration: 650, easing: "ease-in-out" });
     const world = layer("monde")
       .children(TILES.map((tl) => image(`${MONDE}/jour-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h)))
       .when(nightK > 0, (el) => el.children(TILES.map((tl) => image(`${MONDE}/nuit-${tl.k}.png`).absolute().left(tl.x).top(0).w(tl.w).h(WORLD.h).opacity(nightK))))
@@ -494,8 +496,22 @@ export default class Place {
         .on_scroll_wheel((e, cx) => {
           const d = Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y;
           this.camX = this.cam(vw) - d;
+          this.manual = true;
           cx.notify();
         })
+        // click and drag the village to pan (units and buttons stop the press, so their clicks still work)
+        .when(!this.drag, (e) => e.cursor_grab()).when(Boolean(this.drag), (e) => e.cursor_grabbing())
+        .on_mouse_down("left", (e, cx) => { this.drag = { x0: e.position.x, cam0: this.cam(vw) }; cx.notify(); })
+        .on_mouse_move((e, cx) => {
+          if (!this.drag) return;
+          const x = Math.max(0, Math.min(Math.max(0, WORLD.w - vw), this.drag.cam0 - (e.position.x - this.drag.x0)));
+          if (Math.abs(x - this.cam(vw)) < 1) return;
+          this.camX = x;
+          this.manual = true;
+          cx.notify();
+        })
+        .on_mouse_up("left", (_e, cx) => { if (this.drag) { this.drag = null; cx.notify(); } })
+        .on_hover((over, cx) => { if (!over && this.drag) { this.drag = null; cx.notify(); } })
         .child(world)
         .child(this.chronicle()));
   }
