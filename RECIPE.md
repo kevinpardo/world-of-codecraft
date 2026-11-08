@@ -131,11 +131,14 @@ the clock. The art is original: it imitates no existing game.
 
 ## Immersive mode
 
-A second layout, `World-of-Codecraft-Immersion`: the left column keeps the board on top and the command
-panel below (its own block, role `commande`, 400 px); on the right the village and the terminal swap
-places: the village fills the space above (`place`, weight 1, `props.immersion: true`, no panel inside),
-the framed terminal sits below (400 px, resizable). The header's « Immersion » / « Atelier » (Workshop)
-button and ctrl-shift-i switch layouts (`layout.switch`; mods restart, the chronicle stays).
+The same layout, other blocks shown: the left column (`gauche`) keeps the board on top and the command
+panel below (its own block, role `commande`, 400 px, hidden in Workshop); on the right the village and the
+terminal swap places: a second village block (`place-immersion`, weight 1, `props.immersion: true`, no panel
+inside, hidden in Workshop) fills the space above, the framed terminal (`arene`) shrinks to 400 px below
+(resizable), and the bottom village (`place`) is hidden. The header's « Immersion » / « Atelier » (Workshop)
+button and ctrl-shift-i (`world-of-codecraft.mode`, read by the header) run `layout.show` / `layout.hide` /
+`layout.resize`: layout clicks, so the mode survives restarts. Only the shown village writes the chronicle;
+a hidden one keeps no timers. The layout sets no terminal text size, so Herdr's settings choose it.
 - **No zoom: more map, baked by the village's own engine.** The direction A art pipeline (procedural voxel
   models, GI lighting, tiled procedural ground, `compose3` compositor) lives in `tools/village-art/`
   (rebuilt from the session transcripts on 08/11/2026 and verified pixel-identical to the approved bake).

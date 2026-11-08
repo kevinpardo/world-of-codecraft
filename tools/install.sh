@@ -30,10 +30,12 @@ mkdir -p "$DEST/mods" "$DEST/layouts" "$DEST/themes"
 # the mod: an exact copy (rsync only rewrites what changed, so Herdr reloads once)
 [ -L "$DEST/mods/world-of-codecraft" ] && rm -f "$DEST/mods/world-of-codecraft"
 rsync -a --delete --exclude '.DS_Store' "$REPO/mods/world-of-codecraft/" "$DEST/mods/world-of-codecraft/"
-for f in layouts/World-of-Codecraft.json layouts/World-of-Codecraft.png layouts/World-of-Codecraft-Immersion.json layouts/World-of-Codecraft-Immersion.png themes/World-of-Codecraft.json; do
+for f in layouts/World-of-Codecraft.json layouts/World-of-Codecraft.png themes/World-of-Codecraft.json; do
   [ -L "$DEST/$f" ] && rm -f "$DEST/$f" # a symlink left by an older setup
   rsync -a "$REPO/$f" "$DEST/$f"
 done
+# the immersive mode used to be a second layout: now it is a mode of this one
+rm -f "$DEST/layouts/World-of-Codecraft-Immersion.json" "$DEST/layouts/World-of-Codecraft-Immersion.png" "$DEST/layouts/.state/World-of-Codecraft-Immersion.json"
 say "World of Codecraft installed in $DEST"
 
 if [ "$INTEGRATIONS" = 1 ]; then

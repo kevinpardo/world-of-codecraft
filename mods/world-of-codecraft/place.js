@@ -102,6 +102,7 @@ export default class Place {
   // ---------------------------------------------------------------- chronicle
 
   say(text, kind, address) {
+    try { this.log = JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"); } catch {} // the other village may have written
     this.log.unshift({ at: Date.now(), text, kind, address });
     this.log = this.log.slice(0, 40);
     try { localStorage.setItem(LOG_KEY, JSON.stringify(this.log)); } catch {}
@@ -296,7 +297,8 @@ export default class Place {
   }
 
   hidden() {
-    const find = (n) => (!n || typeof n !== "object" ? null : n.id === "place" ? n : (n.children ?? []).map(find).find(Boolean) ?? null);
+    const id = props()?.immersion ? "place-immersion" : "place"; // two villages in the layout, one shown
+    const find = (n) => (!n || typeof n !== "object" ? null : n.id === id ? n : (n.children ?? []).map(find).find(Boolean) ?? null);
     try { return Boolean(find(layout())?.hidden); } catch { return false; }
   }
 
@@ -452,7 +454,10 @@ export default class Place {
     if (!this.live) for (const m of this.mob.values()) m.legs = [];
     let list = agents().map((a) => ({ ...a }));
     if (props()?.demo) list = this.demo(); // screenshots: only the demo heroes, none of the person's agents
-    else if (shared("wocc.lang") || Date.now() - this.born > 4000) this.watch(list); // chronicle once the language is known
+    else if (this.hidden()) { // the other village keeps the chronicle; start afresh when shown again
+      this.prev = null;
+      try { this.log = JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"); } catch {}
+    } else if (shared("wocc.lang") || Date.now() - this.born > 4000) this.watch(list); // chronicle once the language is known
     const order = [...list].sort((a, b) => RANK[a.status] - RANK[b.status] || b.seq - a.seq);
     if (!props()?.demo) setAgentOrder(order.map((a) => a.address));
     const gs = guards().slice(0, 4).map((p) => ({ address: p.terminal, pane: p.pane, guard: true, status: "garde", program: p.program, tab_name: p.title, focused: p.focused }));

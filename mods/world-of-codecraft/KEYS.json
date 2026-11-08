@@ -1,12 +1,17 @@
 {
   "layout:World-of-Codecraft": {
-    "ctrl-shift-j": { "command": "layout.toggle", "args": { "id": "place" } },
-    "ctrl-shift-b": { "command": "layout.toggle", "args": { "id": "tableau" } },
-    "ctrl-shift-i": { "command": "layout.switch", "args": { "name": "World-of-Codecraft-Immersion" } }
-  },
-  "layout:World-of-Codecraft-Immersion": {
-    "ctrl-shift-j": { "command": "layout.toggle", "args": { "id": "place" } },
-    "ctrl-shift-b": { "command": "layout.toggle", "args": { "id": "tableau" } },
-    "ctrl-shift-i": { "command": "layout.switch", "args": { "name": "World-of-Codecraft" } }
+    "ctrl-shift-j": {
+      "command": "layout.toggle",
+      "args": {
+        "id": "place"
+      }
+    },
+    "ctrl-shift-b": {
+      "command": "layout.toggle",
+      "args": {
+        "id": "gauche"
+      }
+    },
+    "ctrl-shift-i": "world-of-codecraft.mode"
   }
 }

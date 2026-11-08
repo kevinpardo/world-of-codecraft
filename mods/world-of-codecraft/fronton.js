@@ -9,14 +9,25 @@
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, agents, run, shared, props, window as appWindow } from "herdr";
+import { spaces, agents, run, props, layout, nextCommand, window as appWindow } from "herdr";
 import { VILLAGE, district, clip, heroOf, heroTitle, hourName, hhmm, isNight, readQuotas, left } from "./kit.js";
 import { P, DECO, TEXTE, bar, pic, txt, button, mark, banner } from "./ui.js";
 import { DEMO_SPACES } from "./demo.js";
 import { t, detectLang } from "./i18n.js";
 
-const WORKSHOP = "World-of-Codecraft";
-const IMMERSION = "World-of-Codecraft-Immersion";
+// Immersive mode lives in the one layout: the big village (place-immersion) and the command panel
+// (commande) are shown, the bottom village (place) hidden, and the terminal (arene) shrinks to 400 px.
+// These are layout clicks, so the mode survives restarts.
+const node = (n, id) => (!n || typeof n !== "object" ? null : n.id === id ? n : (n.children ?? []).map((c) => node(c, id)).find(Boolean) ?? null);
+export function immersive() {
+  try { const n = node(layout(), "place-immersion"); return Boolean(n && !n.hidden); } catch { return false; }
+}
+function setMode(on) {
+  run(on ? "layout.show" : "layout.hide", { id: "place-immersion" });
+  run(on ? "layout.show" : "layout.hide", { id: "commande" });
+  run(on ? "layout.hide" : "layout.show", { id: "place" });
+  run("layout.resize", on ? { id: "arene", px: 400 } : { id: "arene", weight: 1 });
+}
 
 const PW = 136; // plaque width
 
@@ -31,6 +42,8 @@ export default class Fronton {
     };
     tick(cx);
     cx.timer.every(60_000, tick);
+    // ctrl-shift-i (KEYS.json): "world-of-codecraft.mode"
+    cx.spawn(async (cx) => { for (;;) { if ((await nextCommand()) === "mode") { setMode(!immersive()); cx.notify(); } } });
   }
 
   /** An ornate plaque: icon in its gold socket, the value, a caption. */
@@ -52,12 +65,12 @@ export default class Fronton {
     return this.plaque(`res-${acc}`, icon, `${t("pct", rem)}${q.stale ? " ?" : ""}`, five, tip, rem <= 20);
   }
 
-  /** The immersive-mode switch: swaps the village (big) and the terminal (below) by switching layouts. */
+  /** The immersive-mode switch: swaps the village (big) and the terminal (below), in the same layout. */
   mode() {
-    const immersive = shared("layout") === IMMERSION;
-    return button("mode", txt(immersive ? t("workshop") : t("immersion"), 16, P.cream, 800),
-      () => run("layout.switch", { name: immersive ? WORKSHOP : IMMERSION }),
-      { h: 28, tip: immersive ? t("workshopTip") : t("immersionTip") });
+    const on = immersive();
+    return button("mode", txt(on ? t("workshop") : t("immersion"), 16, P.cream, 800),
+      () => setMode(!on),
+      { h: 28, tip: on ? t("workshopTip") : t("immersionTip") });
   }
 
   render(_cx) {
