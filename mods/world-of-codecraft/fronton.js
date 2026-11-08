@@ -9,10 +9,13 @@
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, agents, run, window as appWindow } from "herdr";
+import { spaces, agents, run, shared, window as appWindow } from "herdr";
 import { VILLAGE, district, clip, heroOf, heroTitle, hourName, hhmm, isNight, readQuotas, left } from "./kit.js";
 import { P, DECO, TEXTE, bar, pic, txt, button, mark, banner } from "./ui.js";
 import { t, detectLang } from "./i18n.js";
+
+const WORKSHOP = "World-of-Codecraft";
+const IMMERSION = "World-of-Codecraft-Immersion";
 
 const PW = 136; // plaque width
 
@@ -46,6 +49,14 @@ export default class Fronton {
     const five = q.five ? t("five", 100 - q.five.used) : t("account", acc);
     const tip = t("quotaTip", label, acc, rem, left(q.week.resets) || "?", q.five ? 100 - q.five.used : null, q.five?.resets ? left(q.five.resets) : "", q.stale);
     return this.plaque(`res-${acc}`, icon, `${t("pct", rem)}${q.stale ? " ?" : ""}`, five, tip, rem <= 20);
+  }
+
+  /** The immersive-mode switch: swaps the village (big) and the terminal (below) by switching layouts. */
+  mode() {
+    const immersive = shared("layout") === IMMERSION;
+    return button("mode", txt(immersive ? t("workshop") : t("immersion"), 16, P.cream, 800),
+      () => run("layout.switch", { name: immersive ? WORKSHOP : IMMERSION }),
+      { h: 28, tip: immersive ? t("workshopTip") : t("immersionTip") });
   }
 
   render(_cx) {
@@ -113,6 +124,7 @@ export default class Fronton {
         .when(resets.length > 0, (el) => el.child(this.plaque("res-foire", pic("ic-sablier", 22, 28), fair || "—", t("untilFair"), t("fairTip"))))
         .child(div().flex_1().min_w(0).flex().justify_center().when(Boolean(scroll), (el) => el.child(scroll)))
         .when(Boolean(alert), (el) => el.child(alert))
+        .child(this.mode())
         .child(hour));
   }
 }

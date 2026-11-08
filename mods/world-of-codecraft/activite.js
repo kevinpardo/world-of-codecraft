@@ -18,7 +18,7 @@
 // lasted 15 s; 20 s / 40 s when it means walking to or from the forest edge (meditation, tests and the
 // end of work switch at once).
 
-import { div, image } from "gpui-kit";
+import { zdiv as div, zimage as image } from "./zoom.js"; // world elements: zoomed in the immersive layout
 import { home, readTextFile } from "herdr";
 import { hash, UI, C, heroOf } from "./kit.js";
 import { CREATURES } from "./creatures-data.js";

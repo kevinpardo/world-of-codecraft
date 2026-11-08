@@ -129,6 +129,17 @@ the clock. The art is original: it imitates no existing game.
   heroes stand on still frames, no walking, no scenes, enemies, village life or smoke, and
   no activity polling (about 10 % of a core instead of 27 % on an M2 Pro).
 
+## Immersive mode
+
+A second layout, `World-of-Codecraft-Immersion`: header, then the village filling the window
+(`place`, weight 1, `props.immersion: true`), then the board and the terminal in a 380 px band
+below (resizable). The header's « Immersion » / « Atelier » (Workshop) button and ctrl-shift-i
+switch between the two layouts (`layout.switch`; mods restart, the village keeps nothing but
+its chronicle). In immersion the world is drawn Z = height / 400 times bigger: GPUI has no scale
+transform, so `zoom.js` gives the world builders (`zdiv`, `zimage`, `zsvg`) that multiply every
+length (positions, sizes, paddings, text, left/top loops) by Z; the camera math works in world
+units (visible width = view width / Z). The minimap, chronicle and command panel stay 1×.
+
 ## Built from
 
 - **Layout tree:** a root column made of:
