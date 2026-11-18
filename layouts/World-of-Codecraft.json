@@ -228,7 +228,11 @@
           "role": "place"
         }
       },
-      "background": "#120c0e"
+      "background": "#120c0e",
+      "padding": [
+        0,
+        6
+      ]
     }
   ]
 }

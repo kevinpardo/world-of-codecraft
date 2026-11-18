@@ -14,7 +14,7 @@
 import { div, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { agents, spaces, run, setAgentOrder, props, focused, layout, shared, setShared } from "herdr";
-import { UI, C, hash, clip, heroOf, heroTitle, guards, QUEST, sky, stop } from "./kit.js";
+import { UI, C, hash, clip, heroOf, heroTitle, guards, QUEST, sky, stop, zoom } from "./kit.js";
 import { WORLD, TILES, FRONTS } from "./monde-data.js";
 import { HEROES } from "./heros-data.js";
 import { SPOTS, FIRE, REST, ROAD, BUILDINGS, market, SMOKE, GLOWS, LISIERE } from "./lieux.js";
@@ -28,6 +28,7 @@ import { EXT } from "./terre-data.js";
 const ART = "mods/world-of-codecraft/art";
 const MONDE = `${ART}/monde`;
 const PANEL = 262; // command panel width (lines up with the quest board)
+const GAP = 6; // between the panel and the village, like the board and the terminal
 const RANK = { blocked: 0, done: 1, working: 2, idle: 3, garde: 4 };
 const LOG_KEY = "wocc.chronicle";
 const TICK = 100; // ms: the shared frame timer (10 fps)
@@ -373,8 +374,8 @@ export default class Place {
     return div().id("minicarte").relative().w(mw).h(mh).flex_none().cursor_pointer()
       .tooltip(tr("mapTip"))
       .on_mouse_down("left", (e, cx) => {
-        const lx = e.local_position?.x;
-        if (typeof lx === "number") { this.camX = (lx / mw) * WORLD.w - vw / 2; this.manual = true; cx.notify(); }
+        const lx = e.local_position?.x / zoom();
+        if (Number.isFinite(lx)) { this.camX = (lx / mw) * WORLD.w - vw / 2; this.manual = true; cx.notify(); }
         cx.stop_propagation();
       })
       .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
@@ -469,7 +470,7 @@ export default class Place {
     const sel = units.find((u) => u.a.address === (f?.agent ?? f?.terminal)) ?? units.find((u) => u.a.focused) ?? null;
     // immersive layout: the command panel is its own block (role "commande"), the village takes the full width
     const imm = Boolean(props()?.immersion);
-    const vw = Math.max(200, this.w - (imm ? 0 : PANEL));
+    const vw = Math.max(200, this.w - (imm ? 0 : PANEL + GAP));
     if (imm) this.bridge(units, vw);
     if (sel && sel.a.address !== this.lastFocus) {
       this.lastFocus = sel.a.address;
@@ -534,23 +535,25 @@ export default class Place {
 
     return h_flex().id("place").size_full().bg(C.slate)
       .on_size_change((s, cx) => {
-        if (Math.abs(s.width - this.w) > 10 || s.height !== this.h) { this.w = s.width; this.h = s.height; cx.notify(); }
+        const z = zoom(), w = s.width / z, h = s.height / z;
+        if (Math.abs(w - this.w) > 10 || h !== this.h) { this.w = w; this.h = h; cx.notify(); }
       })
-      .when(!imm, (el) => el.child(panel))
+      .when(!imm, (el) => el.gap(GAP).child(panel))
       .child(div().id("vue").flex_1().h_full().relative().overflow_hidden().bg("#3f6b2c")
         .on_scroll_wheel((e, cx) => {
-          if (imm) { this.camX = this.cam(vw) - e.delta.x; this.camY = this.camV() - e.delta.y; }
-          else this.camX = this.cam(vw) - (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y);
+          const z = zoom();
+          if (imm) { this.camX = this.cam(vw) - e.delta.x / z; this.camY = this.camV() - e.delta.y / z; }
+          else this.camX = this.cam(vw) - (Math.abs(e.delta.x) > Math.abs(e.delta.y) ? e.delta.x : e.delta.y) / z;
           this.manual = true;
           cx.notify();
         })
         // click and drag the village to pan (units and buttons stop the press, so their clicks still work)
         .when(!this.drag, (e) => e.cursor_grab()).when(Boolean(this.drag), (e) => e.cursor_grabbing())
-        .on_mouse_down("left", (e, cx) => { this.drag = { x0: e.position.x, y0: e.position.y, cam0: this.cam(vw), camY0: this.camV() }; cx.notify(); })
+        .on_mouse_down("left", (e, cx) => { this.drag = { x0: e.position.x / zoom(), y0: e.position.y / zoom(), cam0: this.cam(vw), camY0: this.camV() }; cx.notify(); })
         .on_mouse_move((e, cx) => {
           if (!this.drag) return;
-          const x = Math.max(0, Math.min(Math.max(0, WORLD.w - vw), this.drag.cam0 - (e.position.x - this.drag.x0)));
-          const y = imm ? this.drag.camY0 - (e.position.y - this.drag.y0) : 0;
+          const x = Math.max(0, Math.min(Math.max(0, WORLD.w - vw), this.drag.cam0 - (e.position.x / zoom() - this.drag.x0)));
+          const y = imm ? this.drag.camY0 - (e.position.y / zoom() - this.drag.y0) : 0;
           if (Math.abs(x - this.cam(vw)) < 1 && (!imm || Math.abs(y - this.camV()) < 1)) return;
           this.camX = x;
           if (imm) this.camY = y;

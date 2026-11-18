@@ -4,10 +4,12 @@
 
 import { div, image, svg, PathBuilder, Background } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { home, readTextFile, panes } from "herdr";
+import { home, readTextFile, panes, settings } from "herdr";
 import { t, tbl } from "./i18n.js";
 
 export const ART = "mods/world-of-codecraft/art";
+// sizes and pointer positions come in window px, but the mod draws in px at zoom 1: divide by this
+export const zoom = () => Number(settings()?.zoom) || 1;
 export const TITLE = "Cinzel"; // Roman capitals, headings only (fonts/, OFL)
 export const UI = "Alegreya Sans"; // sturdy humanist text, everything else (fonts/, OFL)
 export const VILLAGE = "Valbrume";

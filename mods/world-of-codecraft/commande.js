@@ -65,7 +65,7 @@ export function commandPanel(width, minimap, sel, anim = null) {
 
 import { image } from "gpui-kit";
 import { agents, focused, shared, setShared, props } from "herdr";
-import { heroOf, guards, C as KC } from "./kit.js";
+import { heroOf, guards, zoom, C as KC } from "./kit.js";
 import { DEMO_SELECTED } from "./demo.js";
 import { WORLD } from "./monde-data.js";
 
@@ -84,8 +84,8 @@ export class Commande {
     return div().id("minicarte").relative().w(mw).h(mh).flex_none().cursor_pointer()
       .tooltip(t("mapTip"))
       .on_mouse_down("left", (e, cx) => {
-        const lx = e.local_position?.x;
-        if (typeof lx === "number") setShared("wocc.goto", { x: (lx / mw) * WORLD.w, at: Date.now() });
+        const lx = e.local_position?.x / zoom();
+        if (Number.isFinite(lx)) setShared("wocc.goto", { x: (lx / mw) * WORLD.w, at: Date.now() });
         cx.stop_propagation();
       })
       .child(image(`${MONDE}/minicarte.png`).absolute().left(0).top(0).w(mw).h(mh))
@@ -107,7 +107,7 @@ export class Commande {
   render() {
     const on = shared("wocc.anim") !== false;
     return div().id("commande-bloc").size_full()
-      .on_size_change((s, cx) => { if (Math.abs(s.width - this.w) > 2) { this.w = s.width; cx.notify(); } })
+      .on_size_change((s, cx) => { const w = s.width / zoom(); if (Math.abs(w - this.w) > 2) { this.w = w; cx.notify(); } })
       .child(commandPanel(this.w, this.minimap(), this.selected(), { on, toggle: () => setShared("wocc.anim", !on) }));
   }
 }
