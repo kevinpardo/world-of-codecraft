@@ -13,7 +13,7 @@
 
 import { div, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { agents, spaces, run, setAgentOrder, props, focused, layout, shared, setShared } from "herdr";
+import { agents, spaces, run, setAgentOrder, props, focused, layout, shared, setShared, settings } from "herdr";
 import { UI, C, hash, clip, heroOf, heroTitle, guards, QUEST, sky, stop } from "./kit.js";
 import { WORLD, TILES, FRONTS } from "./monde-data.js";
 import { HEROES } from "./heros-data.js";
@@ -534,7 +534,10 @@ export default class Place {
 
     return h_flex().id("place").size_full().bg(C.slate)
       .on_size_change((s, cx) => {
-        if (Math.abs(s.width - this.w) > 10 || s.height !== this.h) { this.w = s.width; this.h = s.height; cx.notify(); }
+        // on_size_change reports screen px, but everything here is drawn in zoom-1 px (the app zoom scales it):
+        // convert, or at zoom < 1 the world is placed too high (green strip below) and the camera overshoots
+        const z = Number(settings()?.zoom) || 1, w = s.width / z, hh = s.height / z;
+        if (Math.abs(w - this.w) > 10 || Math.abs(hh - (this.h ?? 0)) > 0.5) { this.w = w; this.h = hh; cx.notify(); }
       })
       .when(!imm, (el) => el.child(panel))
       .child(div().id("vue").flex_1().h_full().relative().overflow_hidden().bg("#3f6b2c")
