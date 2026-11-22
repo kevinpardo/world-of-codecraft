@@ -64,7 +64,7 @@ export function commandPanel(width, minimap, sel, anim = null) {
 // ------------------------------------------------------------------ the panel as its own block
 
 import { image } from "gpui-kit";
-import { agents, focused, shared, setShared, props } from "herdr";
+import { agents, focused, shared, setShared, props, settings } from "herdr";
 import { heroOf, guards, C as KC } from "./kit.js";
 import { DEMO_SELECTED } from "./demo.js";
 import { WORLD } from "./monde-data.js";
@@ -107,7 +107,7 @@ export class Commande {
   render() {
     const on = shared("wocc.anim") !== false;
     return div().id("commande-bloc").size_full()
-      .on_size_change((s, cx) => { if (Math.abs(s.width - this.w) > 2) { this.w = s.width; cx.notify(); } })
+      .on_size_change((s, cx) => { const w = s.width / (Number(settings()?.zoom) || 1); if (Math.abs(w - this.w) > 2) { this.w = w; cx.notify(); } }) // screen px -> zoom-1 px
       .child(commandPanel(this.w, this.minimap(), this.selected(), { on, toggle: () => setShared("wocc.anim", !on) }));
   }
 }
