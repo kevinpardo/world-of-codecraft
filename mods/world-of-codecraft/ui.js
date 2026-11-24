@@ -19,7 +19,7 @@ export const P = {
   cream: "#f6ead0", parch: "#e9d9b4", muted: "#cdb98f", dim: "#9a8a72", faint: "#6f6252",
   gold: "#f2c25a", goldHi: "#ffe39a", goldLo: "#b47a22", bronze: "#8a6334",
   ink2: "#2e2016", inkSoft: "#5e4630", wax: "#9c2230",
-  working: "#6fdc78", blocked: "#ff6a52", done: "#f6c24a", idle: "#b9b1d2", guard: "#a8b4c4",
+  working: "#6fdc78", blocked: "#ff6a52", done: "#f6c24a", idle: "#b9b1d2",
 };
 
 const META = {

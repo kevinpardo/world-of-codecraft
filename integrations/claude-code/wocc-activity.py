@@ -10,6 +10,7 @@ Claude Code hook (async, never blocks). Writes ~/.local/state/world-of-codecraft
   coups    successful edits and commands this task (each one = a blow on the creature)
   err      consecutive tool failures, errT the last one (ms)
   subs     running subagents       tache  prompt counter (seeds the creature drawn for the task)
+  allies   running subagents' {id, type} (type = agent_type, e.g. Explore, Plan, implementer), oldest first
   errTache tool failures this task (3+ = the next creature is a boss)
   essai    last test run {ok, t} (act "test" while it runs)   commitT / pushT  last git commit / push (ms)
 
@@ -77,6 +78,7 @@ with open(os.path.join(DIR, ".lock"), "w") as lk:
         s = {}
     s.setdefault("tache", 0)
     s.setdefault("subs", 0)
+    s.setdefault("allies", [])
 
     def act(a):
         if s.get("act") != a:
@@ -84,8 +86,10 @@ with open(os.path.join(DIR, ".lock"), "w") as lk:
 
     if name in ("SubagentStart",):
         s["subs"] = s["subs"] + 1
+        s["allies"] = s["allies"][-7:] + [{"id": ev.get("agent_id") or "", "type": ev.get("agent_type") or ""}]
     elif name == "SubagentStop":
         s["subs"] = max(0, s["subs"] - 1)
+        s["allies"] = [x for x in s["allies"] if x.get("id") != ev.get("agent_id")][-s["subs"]:] if s["subs"] else []
     elif sub:
         pass  # a subagent's own tools: the main hero's scene stays
     elif name == "UserPromptSubmit":
@@ -118,10 +122,11 @@ with open(os.path.join(DIR, ".lock"), "w") as lk:
         if ev.get("source") == "compact":
             act("pense")
         else:
-            s.update(subs=0, err=0, coups=0)
+            s.update(subs=0, allies=[], err=0, coups=0)
             act("fini")
     elif name == "Stop":
         s["subs"] = 0
+        s["allies"] = []
         act("fini")
     s["t"] = now
     tmp = path + ".tmp"
