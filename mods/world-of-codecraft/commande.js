@@ -19,7 +19,7 @@ function heading(text) {
     .child(div().absolute().left(24).right(24).top(0).bottom(0).flex().items_center().child(title(text, 16, P.goldHi)));
 }
 
-function card(sel, ctxLeft) {
+function card(sel, ctxUsed) {
   if (!sel) {
     return v_flex().flex_1().items_center().justify_center().gap(4)
       .child(txt(t("noUnit"), 16, P.muted, 700))
@@ -34,7 +34,7 @@ function card(sel, ctxLeft) {
       .child(title(h.name, 19, P.goldHi).truncate())
       .child(txt(heroDesc(h), 15, P.cream, 700).truncate())
       .child(txt(h.prog, 14, P.muted, 700).truncate())
-      .when(ctxLeft != null, (el) => el.child(healthBar(ctxLeft, 90, t("hp"))))
+      .when(ctxUsed != null, (el) => el.child(healthBar(ctxUsed, 90, t("hp"))))
       .child(h_flex().gap(4).items_center().child(mark(st) ?? gem(st, true)).child(txt(word, 15, TONE[st] ?? P.idle, 800)))
       .when(Boolean(a.tab_name), (el) => el.child(well(div().px(5).py(1).rounded(2), {}).child(txt(t("questTab", a.tab_name), 14, P.parch, 700).truncate())))
       .child(h_flex().gap(6).pt(4)
@@ -49,7 +49,7 @@ function toggle(anim) {
     anim.toggle, { tip: anim.on ? t("animOnTip") : t("animOffTip") }).w_full();
 }
 
-export function commandPanel(width, minimap, sel, anim = null, ctxLeft = null) {
+export function commandPanel(width, minimap, sel, anim = null, ctxUsed = null) {
   const T = frameT("cadre");
   return div().id("commande").relative().flex_none().w(width).h_full().bg(P.leather)
       .child(gradient("#2b1e16", "#100b0a", 165))
@@ -58,7 +58,7 @@ export function commandPanel(width, minimap, sel, anim = null, ctxLeft = null) {
       .child(div().relative().flex_none().self_start().p(5).bg("#0c0a0e").child(minimap).children(frame("fin")))
       .when(Boolean(anim), (el) => el.child(toggle(anim)))
       .child(heading(t("selected")))
-      .child(card(sel, ctxLeft)))
+      .child(card(sel, ctxUsed)))
     .children(frame("cadre"));
 }
 

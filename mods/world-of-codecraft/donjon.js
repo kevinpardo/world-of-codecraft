@@ -109,7 +109,7 @@ export class Donjon {
     st.pushK = st.sent ? Math.floor((t - s.pushT) / TICK) : -1;
     st.allies = this.allies(s, t);
     st.nAllies = Math.max(s?.subs ?? 0, st.allies.length);
-    st.ctx = this.ctx.act.ctxLeft(addr);
+    st.ctx = this.ctx.act.ctxUsed(addr);
     return st;
   }
 

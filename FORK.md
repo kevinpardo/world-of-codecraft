@@ -28,7 +28,7 @@ This fork of [kevinpardo/world-of-codecraft](https://github.com/kevinpardo/world
   - everything else: warrior.
 
   While allies are present, the room switches to its summoning version.
-- **Health is context left:** the bar shows the percentage of the context window still free. It turns red below `HEALTH_LOW = 80` (in `kit.js`), the reset limit. A status-line wrapper writes the value, because hooks do not receive context usage.
+- **Health is context used against fixed limits:** the bar is full at 0 context tokens and empty at `HEALTH_MAX = 250_000`. It turns yellow from `HEALTH_YELLOW = 150_000` and red from `HEALTH_RED = 200_000` (all in `kit.js`). Tokens, not percentages, because the window is 1M and percentages from different tools disagree. A status-line wrapper writes the count, because hooks do not receive context usage.
 - **Dungeon art is procedural:** `tools/village-art/dungeon.py` models the room in voxels and renders it through the village engine, so it matches the village style without hand painting.
 - **Fork, not a copy in dotfiles:** the mod is about 50 MB of PNGs, and the fork can still merge upstream.
 
@@ -47,15 +47,15 @@ This fork of [kevinpardo/world-of-codecraft](https://github.com/kevinpardo/world
 **Files:**
 - `mods/world-of-codecraft/place.js`: village, district buildings, banners, dungeon switch.
 - `mods/world-of-codecraft/donjon.js`: dungeon view, scenes, effects, allies, HUD.
-- `mods/world-of-codecraft/activite.js`: polls activity files, scene choice, blows, context left.
-- `mods/world-of-codecraft/kit.js`: `healthBar`, `HEALTH_LOW`.
+- `mods/world-of-codecraft/activite.js`: polls activity files, scene choice, blows, context used.
+- `mods/world-of-codecraft/kit.js`: `healthBar`, `HEALTH_MAX`, `HEALTH_YELLOW`, `HEALTH_RED`.
 - `mods/world-of-codecraft/art/donjon/`: `salle.png`, `salle-invocation.png` and `meta.json` (anchors in 1600×400 logical px).
 - `tools/village-art/dungeon.py`: renders the room. It takes about 60–70 s on 10 cores.
 - `tools/mirror_heroes.py`: writes the right-facing frames. Run it again after `tools/sync_heroes.py`.
 
 **Data the mod reads,** from `~/.local/state/world-of-codecraft/`:
 - `<terminal>.json`: activity, written by `integrations/claude-code/wocc-activity.py`. It now also records `allies: [{id, type}]`.
-- `<terminal>-ctx.json`: `{"left", "t"}`, written by a status-line wrapper. The wrapper lives in the owner's dotfiles (`claude/hooks/wocc-statusline.py`), not in this repo.
+- `<terminal>-ctx.json`: `{"used", "size", "t"}` (context tokens in use, window size), written by a status-line wrapper. The wrapper lives in the owner's dotfiles (`claude/hooks/wocc-statusline.py`), not in this repo.
 
 ## Update and rebuild
 

@@ -54,15 +54,15 @@ export class Activites {
     this.hits = new Map(); // address -> { coups, at, felled: [{ species, at }] }
     this.timer = null;
     this.busy = false;
-    this.ctxs = new Map(); // address -> { left, t }: context left, from the status-line wrapper
+    this.ctxs = new Map(); // address -> { used, t }: context tokens in use, from the status-line wrapper
     this.ctxAddr = null;
     this.ctxTimer = null;
   }
 
-  /** Percent of the context window still free for an agent, or null (no file, or older than FRESH). */
-  ctxLeft(addr) {
+  /** Context tokens an agent has in use, or null (no file, or older than FRESH). */
+  ctxUsed(addr) {
     const c = this.ctxs.get(addr);
-    return c && Date.now() - (c.t ?? 0) < FRESH ? c.left : null;
+    return c && Date.now() - (c.t ?? 0) < FRESH ? c.used : null;
   }
 
   /** Reads the selected agent's context file now and every 10 s; redraws only when the shown value changes. */
@@ -74,9 +74,9 @@ export class Activites {
     const read = async (acx) => {
       let c = null;
       try { c = JSON.parse((await readTextFile(`${home()}/.local/state/world-of-codecraft/${addr}-ctx.json`)) ?? "null"); } catch { c = null; }
-      const before = this.ctxLeft(addr);
-      if (c && typeof c.left === "number") this.ctxs.set(addr, c); else this.ctxs.delete(addr);
-      if (this.ctxLeft(addr) !== before) acx.notify();
+      const before = this.ctxUsed(addr);
+      if (c && typeof c.used === "number") this.ctxs.set(addr, c); else this.ctxs.delete(addr);
+      if (this.ctxUsed(addr) !== before) acx.notify();
     };
     cx.spawn(read);
     this.ctxTimer = cx.timer.every(10_000, read);

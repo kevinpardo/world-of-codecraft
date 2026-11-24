@@ -197,13 +197,23 @@ export const portrait = (hero, h = 24, sit = false) =>
 
 export const stop = (_e, cx) => cx.stop_propagation();
 
-export const HEALTH_LOW = 80; // context left (percent) under which the health bar turns red
+export const HEALTH_MAX = 250_000; // context tokens at which health is empty
+export const HEALTH_RED = 200_000; // context tokens from which the bar turns red
+export const HEALTH_YELLOW = 150_000; // context tokens from which the bar turns yellow
 
-/** The context-left bar ("health"): `left` is 0..100, `w` its width in px; green, red below HEALTH_LOW. */
-export function healthBar(left, w, label) {
-  const col = left < HEALTH_LOW ? "#d8452f" : "#5cc84a";
+/** The health bar's colour for the context tokens in use. */
+function healthColour(used) {
+  if (used >= HEALTH_RED) return "#d8452f";
+  if (used >= HEALTH_YELLOW) return "#e0b23a";
+  return "#5cc84a";
+}
+
+/** The context bar ("health"): full at 0 tokens, empty at HEALTH_MAX; `w` is its width in px; yellow, then red as it drains. */
+export function healthBar(used, w, label) {
+  const left = Math.max(0, Math.min(100, 100 - (used * 100) / HEALTH_MAX));
+  const col = healthColour(used);
   return h_flex().gap(5).items_center()
     .child(div().relative().w(w).h(9).bg("#1a1014").border_1().border_color("#000000")
       .child(div().absolute().left(0).top(0).bottom(0).w(Math.max(0, Math.round(((w - 2) * left) / 100))).bg(col)))
-    .child(div().font_family(UI).text_size(14).text_color(col).whitespace_nowrap().child(`${label} ${Math.round(left)}%`));
+    .child(div().font_family(UI).text_size(14).text_color(col).whitespace_nowrap().child(`${label} ${Math.round(left)}% · ${Math.round(used / 1000)}k`));
 }
