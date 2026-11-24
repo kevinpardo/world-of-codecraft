@@ -4,7 +4,7 @@
 
 import { div, image, svg, PathBuilder, Background } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { home, readTextFile, panes } from "herdr";
+import { home, readTextFile } from "herdr";
 import { t, tbl } from "./i18n.js";
 
 export const ART = "mods/world-of-codecraft/art";
@@ -95,11 +95,6 @@ export const heroTitle = (h) => `${h.name}, ${heroDesc(h)}`;
 
 /** Per state: `mot` (the short word) and `fr` (the chronicle verb), in the current language. */
 export const QUEST = tbl("quest");
-
-/** Shell terminals (not agents) of every tab: the warriors on guard at the forge. */
-export function guards() {
-  return panes().filter((p) => p.terminal && !p.status && p.program?.shell);
-}
 
 // ------------------------------------------------------------------ time
 
@@ -201,3 +196,14 @@ export const portrait = (hero, h = 24, sit = false) =>
   image(`${hero.sprite}${sit ? "-assis" : ""}.svg`).w(Math.round((h * 18) / 27)).h(h).flex_none();
 
 export const stop = (_e, cx) => cx.stop_propagation();
+
+export const HEALTH_LOW = 80; // context left (percent) under which the health bar turns red
+
+/** The context-left bar ("health"): `left` is 0..100, `w` its width in px; green, red below HEALTH_LOW. */
+export function healthBar(left, w, label) {
+  const col = left < HEALTH_LOW ? "#d8452f" : "#5cc84a";
+  return h_flex().gap(5).items_center()
+    .child(div().relative().w(w).h(9).bg("#1a1014").border_1().border_color("#000000")
+      .child(div().absolute().left(0).top(0).bottom(0).w(Math.max(0, Math.round(((w - 2) * left) / 100))).bg(col)))
+    .child(div().font_family(UI).text_size(14).text_color(col).whitespace_nowrap().child(`${label} ${Math.round(left)}%`));
+}

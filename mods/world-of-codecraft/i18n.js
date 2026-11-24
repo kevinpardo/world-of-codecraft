@@ -90,7 +90,6 @@ const S = {
     selected: "Selected unit",
     noUnit: "No unit selected",
     clickHero: "Click a hero in the village",
-    onGuard: "On guard",
     go: "Go", goTip: "Go to this hero",
     next: "Next", nextTip: "Next hero",
     animations: "Animations", yes: "on", no: "off",
@@ -114,14 +113,13 @@ const S = {
     hearYe: (n, b) => `Hear ye! ${n} ${n === 1 ? "hero" : "heroes"} in the village${b ? `, ${b} awaiting your orders` : ""}`,
     quoted: (s) => ` "${s}"`,
     unitTip: (title, prog, where, word) => `${title} · ${prog}\n${where}\n${word} (click: go there)`,
-    onGuardTerm: "On guard (terminal)",
     help: ["Help!", "Help!", "Orders?", "Over here!"],
     demoTabs: ["PR review", "tests", "migration", "docs", "rest", "map", "triage", "build", "refactor", "fix"],
     // scenes
     ouch: "Ouch!", sealed: "Sealed!", sent: "Message sent!", testsOk: "Tests passed!", testsKo: "Tests failing",
-    // village life
-    treasury: (p) => `Valbrume treasury: ${p}% of account A left this week`,
-    fair: (t) => `The fair: reset in ${t}`,
+    // dungeon view
+    dj: { pense: "Thinking", eclaire: "Searching the archives", combat: "In combat", medite: "Meditating", test: "Running tests", travail: "Working" },
+    djBoss: "Boss: forest troll", djAllies: (n) => `Allies: ${n}`, hp: "Health", djFoe: (n) => `Blows left: ${n}`,
   },
   fr: {
     village: "Valbrume",
@@ -172,7 +170,6 @@ const S = {
     selected: "Unité choisie",
     noUnit: "Aucune unité choisie",
     clickHero: "Clic sur un héros du village",
-    onGuard: "De garde",
     go: "Aller", goTip: "Aller à ce héros",
     next: "Suivant", nextTip: "Héros suivant",
     animations: "Animations", yes: "oui", no: "non",
@@ -193,12 +190,12 @@ const S = {
     hearYe: (n, b) => `Oyez ! ${n} héros au village${b ? `, ${b} attendent tes ordres` : ""}`,
     quoted: (s) => ` « ${s} »`,
     unitTip: (title, prog, where, word) => `${title} · ${prog}\n${where}\n${word} — clic : y aller`,
-    onGuardTerm: "De garde (terminal)",
     help: ["À l'aide !", "À l'aide !", "Tes ordres ?", "Par ici !"],
     demoTabs: ["revue PR", "tests", "migration", "doc", "repos", "carte", "tri", "build", "refonte", "correctif"],
     ouch: "Aïe !", sealed: "Scellé !", sent: "Message envoyé !", testsOk: "Tests réussis !", testsKo: "Tests en échec",
-    treasury: (p) => `Trésor de Valbrume : ${p} % du compte A cette semaine`,
-    fair: (t) => `La foire : réinitialisation dans ${t}`,
+    // vue du donjon
+    dj: { pense: "Réfléchit", eclaire: "Fouille les archives", combat: "Au combat", medite: "Médite", test: "Lance les tests", travail: "Travaille" },
+    djBoss: "Boss : troll des bois", djAllies: (n) => `Alliés : ${n}`, hp: "Santé", djFoe: (n) => `Coups restants : ${n}`,
   },
 };
 

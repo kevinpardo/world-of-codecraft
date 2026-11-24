@@ -6,12 +6,12 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { run } from "herdr";
-import { CLASSES, RACE_FR, QUEST, heroDesc } from "./kit.js";
+import { CLASSES, RACE_FR, QUEST, heroDesc, healthBar } from "./kit.js";
 import { gradient } from "./kit.js";
 import { t } from "./i18n.js";
 import { P, frame, frameT, bar, pic, txt, title, button, gem, mark, portraitCard, well } from "./ui.js";
 
-const TONE = { blocked: P.blocked, done: P.done, working: P.working, idle: P.idle, garde: P.guard };
+const TONE = { blocked: P.blocked, done: P.done, working: P.working, idle: P.idle };
 export const MINI_INSET = 38; // the minimap is PANEL - 38 wide (frame 14 x 2 + iron frame 5 x 2)
 
 function heading(text) {
@@ -19,7 +19,7 @@ function heading(text) {
     .child(div().absolute().left(24).right(24).top(0).bottom(0).flex().items_center().child(title(text, 16, P.goldHi)));
 }
 
-function card(sel) {
+function card(sel, ctxLeft) {
   if (!sel) {
     return v_flex().flex_1().items_center().justify_center().gap(4)
       .child(txt(t("noUnit"), 16, P.muted, 700))
@@ -27,17 +27,18 @@ function card(sel) {
   }
   const { a, h } = sel;
   const st = a.status;
-  const word = QUEST[st]?.mot ?? t("onGuard");
+  const word = QUEST[st]?.mot ?? st;
   return h_flex().flex_1().min_h(0).gap(8).px(2).pt(8).items_start()
     .child(portraitCard(h))
     .child(v_flex().flex_1().min_w(0).gap(3)
       .child(title(h.name, 19, P.goldHi).truncate())
       .child(txt(heroDesc(h), 15, P.cream, 700).truncate())
       .child(txt(h.prog, 14, P.muted, 700).truncate())
+      .when(ctxLeft != null, (el) => el.child(healthBar(ctxLeft, 90, t("hp"))))
       .child(h_flex().gap(4).items_center().child(mark(st) ?? gem(st, true)).child(txt(word, 15, TONE[st] ?? P.idle, 800)))
       .when(Boolean(a.tab_name), (el) => el.child(well(div().px(5).py(1).rounded(2), {}).child(txt(t("questTab", a.tab_name), 14, P.parch, 700).truncate())))
       .child(h_flex().gap(6).pt(4)
-        .child(button("aller", txt(t("go"), 15, P.cream, 800), () => (a.guard ? run("pane.focus", { pane: a.pane }) : run("agent.focus", { terminal: a.address })), { tip: t("goTip") }))
+        .child(button("aller", txt(t("go"), 15, P.cream, 800), () => run("agent.focus", { terminal: a.address }), { tip: t("goTip") }))
         .child(button("suivant", [txt(t("next"), 15, P.cream, 800), pic("ic-suivant", 12, 10)], () => run("agent.next", {}), { tip: t("nextTip") }))));
 }
 
@@ -48,7 +49,7 @@ function toggle(anim) {
     anim.toggle, { tip: anim.on ? t("animOnTip") : t("animOffTip") }).w_full();
 }
 
-export function commandPanel(width, minimap, sel, anim = null) {
+export function commandPanel(width, minimap, sel, anim = null, ctxLeft = null) {
   const T = frameT("cadre");
   return div().id("commande").relative().flex_none().w(width).h_full().bg(P.leather)
       .child(gradient("#2b1e16", "#100b0a", 165))
@@ -57,7 +58,7 @@ export function commandPanel(width, minimap, sel, anim = null) {
       .child(div().relative().flex_none().self_start().p(5).bg("#0c0a0e").child(minimap).children(frame("fin")))
       .when(Boolean(anim), (el) => el.child(toggle(anim)))
       .child(heading(t("selected")))
-      .child(card(sel)))
+      .child(card(sel, ctxLeft)))
     .children(frame("cadre"));
 }
 
@@ -65,12 +66,12 @@ export function commandPanel(width, minimap, sel, anim = null) {
 
 import { image } from "gpui-kit";
 import { agents, focused, shared, setShared, props } from "herdr";
-import { heroOf, guards, C as KC } from "./kit.js";
+import { heroOf, C as KC } from "./kit.js";
 import { DEMO_SELECTED } from "./demo.js";
 import { WORLD } from "./monde-data.js";
 
 const MONDE = "mods/world-of-codecraft/art/monde";
-const DOT = { blocked: KC.quest, done: KC.gold, working: "#7dff6a", idle: "#cfc8da", garde: "#9aa4b1" };
+const DOT = { blocked: KC.quest, done: KC.gold, working: "#7dff6a", idle: "#cfc8da" };
 
 /** Role "commande" (immersive layout): the command panel beside the terminal, under the board. The village
  *  is another block, so the minimap reads its camera and units from the store (wocc.view, written by
@@ -94,13 +95,12 @@ export class Commande {
       .child(div().absolute().left((v.cam / WORLD.w) * mw).top(0).w((v.vw / WORLD.w) * mw).h(mh).border_1().border_color("#ffffff"));
   }
 
-  /** The selected unit, as place.js picks it: the focused agent, else the focused shell. */
+  /** The selected unit, as place.js picks it: the focused agent (none when a shell is focused). */
   selected() {
     if (props()?.demo) return { a: DEMO_SELECTED, h: heroOf(DEMO_SELECTED.address, DEMO_SELECTED.program) };
     const f = focused();
     const want = f?.agent ?? f?.terminal;
-    const a = agents().find((x) => x.address === want)
-      ?? guards().map((p) => ({ address: p.terminal, pane: p.pane, guard: true, status: "garde", program: p.program, tab_name: p.title, focused: p.focused })).find((x) => x.address === want);
+    const a = agents().find((x) => x.address === want);
     return a ? { a, h: heroOf(a.address, a.program) } : null;
   }
 
