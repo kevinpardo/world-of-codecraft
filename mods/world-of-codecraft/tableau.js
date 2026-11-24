@@ -4,11 +4,12 @@
 // sessions (terminals) and heroes (agents) it holds, a count per state (gems: on a quest /
 // help / to turn in / resting), then each of its quests (tabs) on one line with its state and
 // the portraits of its heroes. Text always sits on flat enamel or parchment, never on texture.
-// Click a district: go there; a quest line: show that quest.
+// Click a district: go there; a quest line: show that quest. "+ District" lists this
+// computer and each connected machine, so a district can be founded on another machine.
 
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, agents, run, props } from "herdr";
+import { spaces, agents, run, props, hc } from "herdr";
 import { district, clip, heroOf } from "./kit.js";
 import { gradient } from "./kit.js";
 import { t } from "./i18n.js";
@@ -20,6 +21,33 @@ const COLOR = { blocked: P.blocked, done: P.done, working: P.working, idle: P.id
 const STATE = new Proxy({}, { get: (_o, k) => ({ mot: t("board")[k], color: COLOR[k] }) });
 
 export default class Tableau {
+  init() { this.picking = false; this.machines = []; }
+
+  // Opens or closes the machine list and asks hc for the connected machines.
+  pick(cx) {
+    this.picking = !this.picking;
+    if (this.picking) cx.spawn(async (acx) => {
+      const r = await hc(["machine", "ls", "--json"]).catch(() => null);
+      this.machines = r?.code === 0 ? (JSON.parse(r.stdout).machines ?? []).filter((m) => m.state === "connected" && !m.temporary).map((m) => m.name) : [];
+      acx.notify();
+    });
+    cx.notify();
+  }
+
+  // The machine list under the buttons: one line per machine, then "Add a machine".
+  machineList() {
+    const line = (id, label, tip, fn) => h_flex().id(id).h(28).px(8).gap(6).items_center().rounded(2).cursor_pointer()
+      .hover((s) => s.bg("#ffffff10")).tooltip(tip)
+      .on_click((_e, cx) => { this.picking = false; fn(); cx.notify(); })
+      .child(pic("ic-plus", 11, 11))
+      .child(txt(label, 15, P.cream, 700).flex_1().min_w(0).truncate());
+    const found = (m) => () => run("space.new", { machine: m ?? "" });
+    return well(v_flex().mx(2).mt(6).p(3).gap(1).rounded(2), { bg: P.night })
+      .child(line("quartier-ici", t("thisComputer"), t("foundOn", t("thisComputer")), found(null)))
+      .children(this.machines.map((m) => line(`quartier-sur-${m}`, m, t("foundOn", m), found(m))))
+      .child(line("quartier-machine", t("addMachine"), t("addMachine"), () => run("mod.open", { name: "machine-add" })));
+  }
+
   heading(text, extra) {
     return div().relative().flex_none().h(30)
       .children(bar("bandeau"))
@@ -98,15 +126,17 @@ export default class Tableau {
     const sessions = list.reduce((n, sp) => n + sp.tabs.reduce((m, t) => m + (t.panes || 0), 0), 0);
     const T = frameT("cadre");
     const add = (id, label, tip, fn) => button(id, [pic("ic-plus", 11, 11), txt(label, 15, P.cream, 800)], fn, { tip }).flex_1();
+    const buttons = h_flex().mx(2).mt(10).gap(6)
+      .child(add("nouvelle-quete", t("newQuest"), t("newQuestTip"), () => run("tab.new", {})))
+      .child(add("nouveau-quartier", t("newDistrict"), t("newDistrictTip"), (_e, cx) => this.pick(cx)));
     return div().id("tableau").size_full().relative().bg(P.leather)
       .child(gradient("#2b1e16", "#100b0a", 165))
       .child(v_flex().absolute().left(T).right(T).top(T).bottom(T)
         .child(this.heading(t("districts"), t("sessions", sessions)))
         .child(v_flex().id("quartiers").flex_1().min_h(0).overflow_y_scrollbar().px(2).pb(10)
           .children(list.map((sp) => this.district(sp, all)))
-          .child(h_flex().mx(2).mt(10).gap(6)
-            .child(add("nouvelle-quete", t("newQuest"), t("newQuestTip"), () => run("tab.new", {})))
-            .child(add("nouveau-quartier", t("newDistrict"), t("newDistrictTip"), () => run("space.new", {}))))))
+          .child(buttons)
+          .when(this.picking, (e) => e.child(this.machineList()))))
       .children(frame("cadre"));
   }
 }
