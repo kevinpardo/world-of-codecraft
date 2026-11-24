@@ -3,7 +3,7 @@
 // hour of the day, the Claude quota fountains, and small wood/iron/parchment parts.
 
 import { div, image, svg, PathBuilder, Background } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex } from "gpui-base";
 import { home, readTextFile } from "herdr";
 import { t, tbl } from "./i18n.js";
 
@@ -209,14 +209,12 @@ function healthColour(used) {
 }
 
 /** The context bar ("health"): full at 0 tokens, empty at HEALTH_MAX; `w` is its width in px; yellow, then red as it drains. */
-export function healthBar(used, w, label, stacked = false) {
+export function healthBar(used, w, label) {
   const left = Math.max(0, Math.min(100, 100 - (used * 100) / HEALTH_MAX));
   const col = healthColour(used);
   // the bar keeps its width, so the fill always matches the percentage
   const bar = div().relative().flex_none().w(w).h(9).bg("#1a1014").border_1().border_color("#000000")
     .child(div().absolute().left(0).top(0).bottom(0).w(Math.max(0, Math.round(((w - 2) * left) / 100))).bg(col));
   const text = div().font_family(UI).text_size(14).text_color(col).whitespace_nowrap().child(`${label} ${Math.round(left)}% · ${Math.round(used / 1000)}k`);
-  // narrow places put the label above the bar instead of beside it
-  if (stacked) return v_flex().gap(2).child(text).child(bar);
   return h_flex().gap(5).items_center().child(bar).child(text);
 }

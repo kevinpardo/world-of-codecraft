@@ -6,7 +6,7 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { run } from "herdr";
-import { CLASSES, RACE_FR, QUEST, heroDesc, healthBar } from "./kit.js";
+import { CLASSES, RACE_FR, QUEST, heroDesc } from "./kit.js";
 import { gradient } from "./kit.js";
 import { t } from "./i18n.js";
 import { P, frame, frameT, bar, pic, txt, title, button, gem, mark, portraitCard, well } from "./ui.js";
@@ -19,7 +19,7 @@ function heading(text) {
     .child(div().absolute().left(24).right(24).top(0).bottom(0).flex().items_center().child(title(text, 16, P.goldHi)));
 }
 
-function card(sel, ctxUsed) {
+function card(sel) {
   if (!sel) {
     return v_flex().flex_1().items_center().justify_center().gap(4)
       .child(txt(t("noUnit"), 16, P.muted, 700))
@@ -34,7 +34,6 @@ function card(sel, ctxUsed) {
       .child(title(h.name, 19, P.goldHi).truncate())
       .child(txt(heroDesc(h), 15, P.cream, 700).truncate())
       .child(txt(h.prog, 14, P.muted, 700).truncate())
-      .when(ctxUsed != null, (el) => el.child(healthBar(ctxUsed, 140, t("hp"), true)))
       .child(h_flex().gap(4).items_center().child(mark(st) ?? gem(st, true)).child(txt(word, 15, TONE[st] ?? P.idle, 800)))
       .when(Boolean(a.tab_name), (el) => el.child(well(div().px(5).py(1).rounded(2), {}).child(txt(t("questTab", a.tab_name), 14, P.parch, 700).truncate())))
       .child(h_flex().gap(6).pt(4)
@@ -49,7 +48,7 @@ function toggle(anim) {
     anim.toggle, { tip: anim.on ? t("animOnTip") : t("animOffTip") }).w_full();
 }
 
-export function commandPanel(width, minimap, sel, anim = null, ctxUsed = null) {
+export function commandPanel(width, minimap, sel, anim = null) {
   const T = frameT("cadre");
   return div().id("commande").relative().flex_none().w(width).h_full().bg(P.leather)
       .child(gradient("#2b1e16", "#100b0a", 165))
@@ -58,7 +57,7 @@ export function commandPanel(width, minimap, sel, anim = null, ctxUsed = null) {
       .child(div().relative().flex_none().self_start().p(5).bg("#0c0a0e").child(minimap).children(frame("fin")))
       .when(Boolean(anim), (el) => el.child(toggle(anim)))
       .child(heading(t("selected")))
-      .child(card(sel, ctxUsed)))
+      .child(card(sel)))
     .children(frame("cadre"));
 }
 

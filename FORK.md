@@ -69,6 +69,6 @@ This fork of [kevinpardo/world-of-codecraft](https://github.com/kevinpardo/world
 - Allies stand close together and touch the hero at 1.25× scale. Spread them further left or draw them smaller.
 - Only the tower banner has been checked on screen. The banner positions for the other buildings are estimates.
 - Immersion mode has not been tested since the changes.
-- The standalone `commande` block (immersion layout) shows no health bar.
+- Only the dungeon card shows health; the village panel has no health bar.
 - `art/ic-parchemin.svg` and the i18n keys `village`, `accountNone` and `campfire` are unused but still in the tree.
 - `creatures-data.js` has no entry for the restored pigeon frames. Their sizes are a constant in `donjon.js`.

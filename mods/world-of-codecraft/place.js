@@ -408,7 +408,7 @@ export default class Place {
 
     const scene = dungeon ? [] : this.village(units, sel, { vw, camX, imm, nightK, nightHeroes });
 
-    const panel = imm ? null : commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) }, this.act.ctxUsed(sel?.a.address));
+    const panel = imm ? null : commandPanel(PANEL, this.minimap(units, vw), sel, { on: this.live, toggle: () => setShared("wocc.anim", !this.live) });
 
     return h_flex().id("place").size_full().bg(C.slate)
       .on_size_change((s, cx) => {

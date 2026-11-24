@@ -333,7 +333,7 @@ def main():
     Image.fromarray(rgb).resize((W * 2, H * 2), Image.NEAREST).save(os.path.join(OUT, 'salle.png'))
     Image.fromarray(rgb2).resize((W * 2, H * 2), Image.NEAREST).save(os.path.join(OUT, 'salle-invocation.png'))
     meta = {'size': [W, H], 'hero': [640, 335], 'foe': [860, 335], 'dummy': [860, 335],
-            'shelf': [335, 252], 'rest': [1190, 322],
+            'shelf': [430, 292], 'rest': [1190, 322],
             'allies': [[572, 338], [520, 300], [470, 350], [415, 312]], 'circle': [CIRC[0], CIRC[1]],
             'torches': [list(f) for f in flames], 'floor': [236, 392]}
     json.dump(meta, open(os.path.join(OUT, 'meta.json'), 'w'), indent=2)
