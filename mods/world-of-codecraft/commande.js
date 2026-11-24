@@ -34,7 +34,7 @@ function card(sel, ctxUsed) {
       .child(title(h.name, 19, P.goldHi).truncate())
       .child(txt(heroDesc(h), 15, P.cream, 700).truncate())
       .child(txt(h.prog, 14, P.muted, 700).truncate())
-      .when(ctxUsed != null, (el) => el.child(healthBar(ctxUsed, 90, t("hp"))))
+      .when(ctxUsed != null, (el) => el.child(healthBar(ctxUsed, 140, t("hp"), true)))
       .child(h_flex().gap(4).items_center().child(mark(st) ?? gem(st, true)).child(txt(word, 15, TONE[st] ?? P.idle, 800)))
       .when(Boolean(a.tab_name), (el) => el.child(well(div().px(5).py(1).rounded(2), {}).child(txt(t("questTab", a.tab_name), 14, P.parch, 700).truncate())))
       .child(h_flex().gap(6).pt(4)
